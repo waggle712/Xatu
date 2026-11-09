@@ -1,0 +1,4 @@
+{
+  "extends": "@xatu/config/tsconfig/react-native.json",
+  "include": ["src"]
+}

@@ -1,0 +1,62 @@
+/* Xatu: generated from tokens.json */
+:root {
+  --surface: #FCF8F1;
+  --surface-raised: #FFFFFF;
+  --surface-warm: #F4E6CF;
+  --ink: #3A2230;
+  --ink-muted: #6E5A64;
+  --line: #E8DCD3;
+  --taupe: #BFB3AA;
+  --brand: #9A4E5E;
+  --brand-fill: #C98A96;
+  --on-brand: #3A2230;
+  --blush: #EBCFD0;
+  --plum: #3A2230;
+  --on-plum: #FCF8F1;
+  --marigold: #E3A62F;
+  --on-marigold: #3A2230;
+  --sage: #4E6B4C;
+  --sage-soft: #E2EADB;
+  --gold: #C29A62;
+  --gold-text: #7A5826;
+  --critical: #B3261E;
+  --focus-ring: #9A4E5E;
+  --font-display: "Fraunces", "Noto Serif Tamil", Georgia, serif;
+  --font-sans: "Hind Madurai", "Noto Sans Tamil", system-ui, sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(58,34,48,0.08), 0 6px 16px rgba(58,34,48,0.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1E1218;
+    --surface-raised: #2B1B24;
+    --surface-warm: #33222B;
+    --ink: #FCF8F1;
+    --ink-muted: #CDBBC3;
+    --line: #3F2C36;
+    --taupe: #6E625A;
+    --brand: #E3AAB6;
+    --brand-fill: #C98A96;
+    --on-brand: #3A2230;
+    --blush: #3E2530;
+    --plum: #4A2E3D;
+    --on-plum: #FCF8F1;
+    --marigold: #F0B544;
+    --on-marigold: #3A2230;
+    --sage: #A9C4A0;
+    --sage-soft: #23301F;
+    --gold: #C29A62;
+    --gold-text: #E0BC85;
+    --critical: #FF8A80;
+    --focus-ring: #F0B544;
+  }
+}

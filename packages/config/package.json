@@ -1,0 +1,27 @@
+{
+  "name": "@xatu/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./brand": "./src/brand.ts",
+    "./eslint": "./eslint.config.js",
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/node.json": "./tsconfig/node.json",
+    "./tsconfig/react-native.json": "./tsconfig/react-native.json"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.70.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}

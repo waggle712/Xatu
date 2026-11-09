@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+docs/brand-kit/
+docs/screens/
+**/migrations/**
+apps/mobile/ios/
+apps/mobile/android/
