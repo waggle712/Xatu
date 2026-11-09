@@ -31,3 +31,4 @@ allowBuilds:
   '@scarf/scarf': false
   '@firebase/util': false
   protobufjs: false
+  '@parcel/watcher': false
