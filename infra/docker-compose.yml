@@ -1,0 +1,38 @@
+# Local development only. Staging and production use managed AWS services (RDS, ElastiCache).
+name: xatu
+
+services:
+  postgres:
+    # Multi-arch PostGIS build (runs natively on Apple Silicon and x86).
+    image: imresamu/postgis:16-3.5
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-xatu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xatu_local}
+      POSTGRES_DB: ${POSTGRES_DB:-xatu}
+    ports:
+      - '${POSTGRES_PORT:-5434}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-xatu} -d ${POSTGRES_DB:-xatu}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6380}:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
+  redisdata:

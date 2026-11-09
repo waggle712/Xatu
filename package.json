@@ -12,7 +12,11 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d --wait",
+    "db:down": "docker compose -f infra/docker-compose.yml down",
+    "db:reset": "docker compose -f infra/docker-compose.yml down -v",
+    "db:logs": "docker compose -f infra/docker-compose.yml logs -f"
   },
   "devDependencies": {
     "prettier": "^3.9.10",
