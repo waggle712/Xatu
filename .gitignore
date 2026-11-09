@@ -20,3 +20,6 @@ apps/mobile/android/
 # Firebase native config (each developer downloads their own)
 google-services.json
 GoogleService-Info.plist
+
+# Generated Prisma client
+apps/api/src/generated/

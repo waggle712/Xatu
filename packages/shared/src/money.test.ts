@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPaise, paiseSchema } from './money';
+import { formatPaise, paiseSchema } from './money.ts';
 
 describe('money', () => {
   it('formats whole rupees without decimals', () => {

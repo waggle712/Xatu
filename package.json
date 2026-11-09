@@ -16,7 +16,10 @@
     "db:up": "docker compose -f infra/docker-compose.yml up -d --wait",
     "db:down": "docker compose -f infra/docker-compose.yml down",
     "db:reset": "docker compose -f infra/docker-compose.yml down -v",
-    "db:logs": "docker compose -f infra/docker-compose.yml logs -f"
+    "db:logs": "docker compose -f infra/docker-compose.yml logs -f",
+    "test:e2e": "pnpm --filter api test:e2e",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:seed": "pnpm --filter api db:seed"
   },
   "devDependencies": {
     "prettier": "^3.9.10",
