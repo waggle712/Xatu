@@ -29,3 +29,5 @@ allowBuilds:
   prisma: true
   esbuild: true
   '@scarf/scarf': false
+  '@firebase/util': false
+  protobufjs: false

@@ -6,6 +6,15 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
+
+  /** Firebase project whose phone-auth ID tokens we accept. */
+  FIREBASE_PROJECT_ID: z.string().min(1),
+  /** HS256 secret for our own access tokens. At least 32 random characters. */
+  JWT_SECRET: z.string().min(32),
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  /** Set to 1 behind a load balancer so rate limits see the real client IP. */
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 });
 
 export type Env = z.infer<typeof envSchema>;
