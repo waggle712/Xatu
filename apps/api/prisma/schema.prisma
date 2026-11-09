@@ -1,0 +1,677 @@
+// Xatu database schema: first release (marketplace first).
+//
+// Follows the founder's architecture audit (10 Nov 2026):
+// - marketplace first: no posts, reels, trust_scores or media_fingerprints yet
+// - order status and payment status are separate state machines
+// - append-only double-entry ledger for every money movement
+// - stock is reserved during checkout (inventory_reservations)
+// - purchase-time snapshots on orders and order items
+//
+// Conventions: UUIDv7 ids, money in integer paise, created_at/updated_at on every table,
+// media stored as storage keys (never full URLs), region/city columns for later per-city launches.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum UserRole {
+  buyer
+  seller
+  admin
+}
+
+enum Language {
+  ta
+  en
+}
+
+enum AccountStatus {
+  active
+  suspended
+}
+
+enum VerificationStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+enum ProductStatus {
+  draft
+  active
+  paused
+  archived
+}
+
+/// Only `live` items are shown to buyers.
+enum ModerationStatus {
+  pending
+  live
+  held
+  removed
+}
+
+enum FulfilmentMode {
+  courier
+  pickup
+  local_delivery
+}
+
+/// Fulfilment lifecycle. Payment has its own lifecycle (PaymentStatus).
+enum OrderStatus {
+  pending_payment
+  paid
+  accepted
+  ready_for_pickup
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+enum PaymentStatus {
+  initiated
+  pending
+  verified
+  settlement_eligible
+  settled
+  failed
+  expired
+  refund_pending
+  refunded
+  disputed
+  reversed
+}
+
+enum RefundStatus {
+  requested
+  approved
+  processing
+  completed
+  rejected
+  failed
+}
+
+enum ReservationStatus {
+  active
+  committed
+  released
+  expired
+}
+
+enum LedgerAccountType {
+  asset
+  liability
+  revenue
+  expense
+}
+
+enum LedgerDirection {
+  debit
+  credit
+}
+
+enum ReportTargetType {
+  user
+  seller
+  product
+  review
+}
+
+enum ReportStatus {
+  open
+  reviewing
+  actioned
+  dismissed
+}
+
+enum IdempotencyStatus {
+  in_progress
+  completed
+}
+
+enum DevicePlatform {
+  android
+  ios
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+model User {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  firebaseUid String        @unique @map("firebase_uid")
+  phone       String        @unique
+  name        String?
+  language    Language      @default(ta)
+  roles       UserRole[]    @default([buyer])
+  status      AccountStatus @default(active)
+  region      String        @default("IN-TN")
+  city        String?
+  deletedAt   DateTime?     @map("deleted_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  sessions        Session[]
+  deviceTokens    DeviceToken[]
+  consents        ConsentRecord[]
+  sellerProfile   SellerProfile?
+  addresses       Address[]
+  ordersAsBuyer   Order[]                @relation("BuyerOrders")
+  reservations    InventoryReservation[]
+  reviews         Review[]
+  reports         Report[]               @relation("Reporter")
+  idempotencyKeys IdempotencyKey[]
+
+  @@map("users")
+}
+
+/// Refresh-token sessions. Tokens are stored hashed and rotated on every refresh.
+model Session {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  deviceName       String?   @map("device_name")
+  ip               String?
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  replacedById     String?   @map("replaced_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  expoToken String         @unique @map("expo_token")
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+/// Evidence of notices accepted (DPDP Act): which document version, when.
+model ConsentRecord {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  purpose     String
+  version     String
+  grantedAt   DateTime  @default(now()) @map("granted_at")
+  withdrawnAt DateTime? @map("withdrawn_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("consent_records")
+}
+
+// ───────────────────────────── Profiles ─────────────────────────────
+
+model SellerProfile {
+  id                 String                                 @id @default(uuid(7)) @db.Uuid
+  userId             String                                 @unique @map("user_id") @db.Uuid
+  handle             String                                 @unique @db.Citext
+  businessName       String                                 @map("business_name")
+  bio                String?
+  categoryId         String?                                @map("category_id") @db.Uuid
+  city               String
+  region             String                                 @default("IN-TN")
+  pincode            String
+  /// PostGIS point (WGS 84). Written with raw SQL; Prisma treats it as opaque.
+  location           Unsupported("geography(Point, 4326)")?
+  pickupAvailable    Boolean                                @default(true) @map("pickup_available")
+  localDelivery      Boolean                                @default(false) @map("local_delivery")
+  courierAvailable   Boolean                                @default(false) @map("courier_available")
+  verificationStatus VerificationStatus                     @default(unverified) @map("verification_status")
+  verifiedAt         DateTime?                              @map("verified_at")
+  status             AccountStatus                          @default(active)
+  createdAt          DateTime                               @default(now()) @map("created_at")
+  updatedAt          DateTime                               @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category Category? @relation(fields: [categoryId], references: [id])
+  products Product[]
+  orders   Order[]   @relation("SellerOrders")
+  reviews  Review[]
+
+  @@index([city, status])
+  @@index([pincode])
+  @@index([location], type: Gist, map: "seller_profiles_location_gist_idx")
+  @@index([businessName(ops: raw("gin_trgm_ops"))], type: Gin, map: "seller_profiles_business_name_trgm_idx")
+  @@map("seller_profiles")
+}
+
+// ───────────────────────────── Catalog ─────────────────────────────
+
+model Category {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  slug      String   @unique
+  nameEn    String   @map("name_en")
+  nameTa    String   @map("name_ta")
+  parentId  String?  @map("parent_id") @db.Uuid
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   Category?       @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[]      @relation("CategoryTree")
+  products Product[]
+  sellers  SellerProfile[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               String           @id @default(uuid(7)) @db.Uuid
+  sellerId         String           @map("seller_id") @db.Uuid
+  categoryId       String?          @map("category_id") @db.Uuid
+  title            String
+  titleTa          String?          @map("title_ta")
+  description      String?
+  descriptionTa    String?          @map("description_ta")
+  sku              String?
+  pricePaise       Int              @map("price_paise")
+  /// Units on hand. Units held by active reservations are subtracted at checkout time.
+  stock            Int              @default(0)
+  /// Category-specific validated attributes (material, size, weight...).
+  attributes       Json             @default("{}")
+  fulfilmentModes  FulfilmentMode[] @default([pickup]) @map("fulfilment_modes")
+  status           ProductStatus    @default(draft)
+  moderationStatus ModerationStatus @default(pending) @map("moderation_status")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  seller       SellerProfile          @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  category     Category?              @relation(fields: [categoryId], references: [id])
+  media        ProductMedia[]
+  orderItems   OrderItem[]
+  reservations InventoryReservation[]
+
+  @@unique([sellerId, sku])
+  @@index([sellerId, status])
+  @@index([categoryId, status, moderationStatus])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
+  @@map("products")
+}
+
+model ProductMedia {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  productId     String   @map("product_id") @db.Uuid
+  storageKey    String   @map("storage_key")
+  width         Int?
+  height        Int?
+  position      Int      @default(0)
+  capturedInApp Boolean  @default(false) @map("captured_in_app")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+  @@map("product_media")
+}
+
+// ───────────────────────────── Orders ─────────────────────────────
+
+model Address {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  name      String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  state     String    @default("Tamil Nadu")
+  pincode   String
+  isDefault Boolean   @default(false) @map("is_default")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+/// Stock held for a buyer during checkout. Committed when payment is verified,
+/// released when payment fails or the reservation expires.
+model InventoryReservation {
+  id        String            @id @default(uuid(7)) @db.Uuid
+  productId String            @map("product_id") @db.Uuid
+  buyerId   String            @map("buyer_id") @db.Uuid
+  orderId   String?           @map("order_id") @db.Uuid
+  quantity  Int
+  status    ReservationStatus @default(active)
+  expiresAt DateTime          @map("expires_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  buyer   User    @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  @@index([productId, status])
+  @@index([status, expiresAt])
+  @@map("inventory_reservations")
+}
+
+model Order {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  /// Short human code shown to buyers and sellers, e.g. XT-2041.
+  code            String         @unique
+  buyerId         String         @map("buyer_id") @db.Uuid
+  sellerId        String         @map("seller_id") @db.Uuid
+  status          OrderStatus    @default(pending_payment)
+  fulfilmentMode  FulfilmentMode @map("fulfilment_mode")
+  subtotalPaise   Int            @map("subtotal_paise")
+  shippingPaise   Int            @default(0) @map("shipping_paise")
+  totalPaise      Int            @map("total_paise")
+  /// Copy of the delivery address at purchase time (null for pickup).
+  addressSnapshot Json?          @map("address_snapshot")
+  /// Copy of seller name, handle and pickup place at purchase time.
+  sellerSnapshot  Json           @map("seller_snapshot")
+  region          String         @default("IN-TN")
+  city            String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  buyer          User                   @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller         SellerProfile          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict)
+  items          OrderItem[]
+  events         OrderEvent[]
+  payments       Payment[]
+  reservations   InventoryReservation[]
+  refundRequests RefundRequest[]
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  orderId          String   @map("order_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  /// Purchase-time copies, so later listing edits never change what was bought.
+  titleSnapshot    String   @map("title_snapshot")
+  unitPricePaise   Int      @map("unit_price_paise")
+  quantity         Int
+  /// Commission in basis points (500 = 5%) from the rule active at purchase time.
+  commissionBps    Int      @map("commission_bps")
+  commissionRuleId String?  @map("commission_rule_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  commissionRule CommissionRule? @relation(fields: [commissionRuleId], references: [id])
+  review         Review?
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+/// Append-only history of every order status change.
+model OrderEvent {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  orderId    String       @map("order_id") @db.Uuid
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+  actorId    String?      @map("actor_id") @db.Uuid
+  note       String?
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
+}
+
+// ───────────────────────────── Payments and ledger ─────────────────────────────
+
+model Payment {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  orderId           String        @map("order_id") @db.Uuid
+  provider          String        @default("razorpay")
+  providerOrderId   String?       @unique @map("provider_order_id")
+  providerPaymentId String?       @unique @map("provider_payment_id")
+  status            PaymentStatus @default(initiated)
+  amountPaise       Int           @map("amount_paise")
+  currency          String        @default("INR")
+  failureReason     String?       @map("failure_reason")
+  verifiedAt        DateTime?     @map("verified_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refundRequests RefundRequest[]
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payments")
+}
+
+/// Every provider webhook, stored once by provider event id so replays are no-ops.
+model PaymentWebhookEvent {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  provider        String    @default("razorpay")
+  providerEventId String    @map("provider_event_id")
+  eventType       String    @map("event_type")
+  payload         Json
+  signatureValid  Boolean   @map("signature_valid")
+  processedAt     DateTime? @map("processed_at")
+  outcome         String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([provider, providerEventId])
+  @@map("payment_webhook_events")
+}
+
+model RefundRequest {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  orderId          String       @map("order_id") @db.Uuid
+  paymentId        String       @map("payment_id") @db.Uuid
+  amountPaise      Int          @map("amount_paise")
+  reason           String
+  status           RefundStatus @default(requested)
+  providerRefundId String?      @unique @map("provider_refund_id")
+  requestedById    String       @map("requested_by_id") @db.Uuid
+  approvedById     String?      @map("approved_by_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("refund_requests")
+}
+
+/// Versioned commission rules; the rule in force at purchase time is copied to the order item.
+model CommissionRule {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  name       String
+  categoryId String?   @map("category_id") @db.Uuid
+  rateBps    Int       @map("rate_bps")
+  validFrom  DateTime  @map("valid_from")
+  validTo    DateTime? @map("valid_to")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  orderItems OrderItem[]
+
+  @@index([categoryId, validFrom])
+  @@map("commission_rules")
+}
+
+/// Chart of accounts: platform revenue, seller payables, provider clearing, TCS, TDS...
+model LedgerAccount {
+  id        String            @id @default(uuid(7)) @db.Uuid
+  code      String            @unique
+  name      String
+  type      LedgerAccountType
+  /// Set for per-seller payable accounts.
+  sellerId  String?           @map("seller_id") @db.Uuid
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  entries LedgerEntry[]
+
+  @@index([sellerId])
+  @@map("ledger_accounts")
+}
+
+/// Groups balanced entries for one business event (payment verified, refund, payout...).
+model LedgerTransaction {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  kind        String
+  /// What caused it, e.g. payment id or refund id. Unique per kind so it is posted once.
+  referenceId String   @map("reference_id")
+  description String?
+  postedAt    DateTime @default(now()) @map("posted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  entries LedgerEntry[]
+
+  @@unique([kind, referenceId])
+  @@map("ledger_transactions")
+}
+
+/// Append-only. Corrections are new reversing entries, never updates.
+model LedgerEntry {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  transactionId String          @map("transaction_id") @db.Uuid
+  accountId     String          @map("account_id") @db.Uuid
+  direction     LedgerDirection
+  amountPaise   Int             @map("amount_paise")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  transaction LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account     LedgerAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+/// Stored responses for Idempotency-Key headers on money endpoints.
+model IdempotencyKey {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  key          String
+  userId       String            @map("user_id") @db.Uuid
+  endpoint     String
+  requestHash  String            @map("request_hash")
+  status       IdempotencyStatus @default(in_progress)
+  responseCode Int?              @map("response_code")
+  responseBody Json?             @map("response_body")
+  expiresAt    DateTime          @map("expires_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint, key])
+  @@map("idempotency_keys")
+}
+
+// ───────────────────────────── Trust and safety ─────────────────────────────
+
+/// Only for a delivered order item, by that order's buyer (enforced in the trust module).
+model Review {
+  id               String           @id @default(uuid(7)) @db.Uuid
+  orderItemId      String           @unique @map("order_item_id") @db.Uuid
+  buyerId          String           @map("buyer_id") @db.Uuid
+  sellerId         String           @map("seller_id") @db.Uuid
+  rating           Int
+  body             String?
+  photoKeys        String[]         @default([]) @map("photo_keys")
+  moderationStatus ModerationStatus @default(live) @map("moderation_status")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  orderItem OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  buyer     User          @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  seller    SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, createdAt])
+  @@map("reviews")
+}
+
+model Report {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  reporterId  String           @map("reporter_id") @db.Uuid
+  targetType  ReportTargetType @map("target_type")
+  targetId    String           @map("target_id") @db.Uuid
+  reason      String
+  details     String?
+  status      ReportStatus     @default(open)
+  handledById String?          @map("handled_by_id") @db.Uuid
+  resolution  String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+  @@map("reports")
+}
+
+/// Every sensitive admin action (verification, suspension, refund approval...).
+model AdminAuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  adminId    String   @map("admin_id") @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  before     Json?
+  after      Json?
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([targetType, targetId])
+  @@index([adminId, createdAt])
+  @@map("admin_audit_logs")
+}
+
+// ───────────────────────────── Shared ─────────────────────────────
+
+/// Written in the same transaction as the state change it describes; a worker publishes it.
+model OutboxEvent {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  topic       String
+  aggregateId String    @map("aggregate_id")
+  payload     Json
+  attempts    Int       @default(0)
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([publishedAt, createdAt])
+  @@map("outbox_events")
+}

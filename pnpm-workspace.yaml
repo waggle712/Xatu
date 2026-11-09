@@ -15,5 +15,17 @@ minimumReleaseAgeExclude:
   - '@typescript-eslint/scope-manager@8.72.2'
   - '@typescript-eslint/types@8.72.2'
   - '@typescript-eslint/visitor-keys@8.72.2'
+  - '@nestjs/common@12.4.2'
+  - '@nestjs/core@12.4.2'
+  - '@nestjs/platform-express@12.4.2'
+  - '@nestjs/testing@12.4.2'
+  - dotenv@18.0.10
 
 nodeLinker: hoisted
+
+# Dependencies allowed to run install scripts (pnpm blocks all others).
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  esbuild: true
+  '@scarf/scarf': false
