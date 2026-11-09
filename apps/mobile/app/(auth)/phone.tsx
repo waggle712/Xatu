@@ -46,14 +46,16 @@ export default function PhoneScreen() {
       <TextField
         label={t('phone.label')}
         value={number}
+        // Keep the raw text while typing (rewriting it per keystroke can reorder fast input);
+        // toIndianE164 cleans and validates it on submit.
         onChangeText={(v) => {
-          setNumber(v.replace(/[^\d ]/g, ''));
+          setNumber(v);
           if (error) setError(null);
         }}
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
         autoComplete="tel"
-        maxLength={12}
+        maxLength={16}
         autoFocus
         placeholder="98765 43210"
         error={error}

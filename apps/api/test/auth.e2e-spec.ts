@@ -175,6 +175,17 @@ describe('Auth (e2e)', () => {
     await request(app.getHttpServer()).post('/auth/refresh').send(body).expect(401);
   });
 
+  it.runIf(env.AUTH_DEV_BYPASS)(
+    'never links a real Firebase account by phone while the development login is on',
+    async () => {
+      await prisma.user.create({ data: { firebaseUid: `test-${run}-real`, phone: phone(9) } });
+      const res = await signIn(9).expect(401);
+      expect(res.body.error.code).toBe('invalid_firebase_token');
+      const user = await prisma.user.findUniqueOrThrow({ where: { phone: phone(9) } });
+      expect(user.firebaseUid).toBe(`test-${run}-real`);
+    },
+  );
+
   it('rate-limits sign-in attempts per IP', async () => {
     for (let i = 0; i < 10; i++) {
       await request(app.getHttpServer())
