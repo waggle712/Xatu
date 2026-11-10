@@ -1,4 +1,5 @@
 {
   "extends": "@xatu/config/tsconfig/react-native.json",
+  "compilerOptions": { "types": [] },
   "include": ["src"]
 }

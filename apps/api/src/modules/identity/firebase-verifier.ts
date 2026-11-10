@@ -46,3 +46,21 @@ export class FirebaseAdminVerifier extends FirebaseVerifier {
     return { firebaseUid: decoded.uid, phone: decoded.phone_number };
   }
 }
+
+/** The fixed code accepted by the development verifier (same as the Firebase test numbers). */
+export const DEV_OTP_CODE = '123456';
+
+/**
+ * Development-only verifier, enabled with AUTH_DEV_BYPASS=true (refused in production).
+ * Accepts "dev|<E.164 phone>|123456" so the full login flow runs without a Firebase project.
+ */
+@Injectable()
+export class DevFirebaseVerifier extends FirebaseVerifier {
+  async verify(idToken: string): Promise<VerifiedPhoneIdentity> {
+    const [kind, phone, code] = idToken.split('|');
+    if (kind !== 'dev' || !phone || !/^\+91[6-9]\d{9}$/.test(phone) || code !== DEV_OTP_CODE) {
+      throw new InvalidFirebaseTokenError('Invalid development sign-in');
+    }
+    return { firebaseUid: `dev-${phone}`, phone };
+  }
+}

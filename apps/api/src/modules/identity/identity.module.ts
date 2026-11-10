@@ -2,7 +2,12 @@ import { Module } from '@nestjs/common';
 import { RateLimitGuard } from '../../common/rate-limit.js';
 import { AuthController } from './auth.controller.js';
 import { AuthGuard } from './auth.guard.js';
-import { FirebaseAdminVerifier, FirebaseVerifier } from './firebase-verifier.js';
+import { env } from '../../config/env.js';
+import {
+  DevFirebaseVerifier,
+  FirebaseAdminVerifier,
+  FirebaseVerifier,
+} from './firebase-verifier.js';
 import { IdentityService } from './identity.service.js';
 import { TokenService } from './token.service.js';
 
@@ -17,7 +22,10 @@ import { TokenService } from './token.service.js';
     TokenService,
     AuthGuard,
     RateLimitGuard,
-    { provide: FirebaseVerifier, useClass: FirebaseAdminVerifier },
+    {
+      provide: FirebaseVerifier,
+      useClass: env.AUTH_DEV_BYPASS ? DevFirebaseVerifier : FirebaseAdminVerifier,
+    },
   ],
   exports: [AuthGuard, TokenService, IdentityService],
 })

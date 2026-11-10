@@ -1,0 +1,63 @@
+{
+  "welcome": {
+    "headline": "Buy from makers\nnear you, with trust",
+    "subtitle": "Cakes, terracotta, jewellery, henna and plants from {{city}}'s home makers.",
+    "chooseLanguage": "Choose your language",
+    "trustChecked": "Every maker checked by our team",
+    "trustPay": "Pay safely inside the app",
+    "trustReviews": "Reviews only from real buyers",
+    "continuePhone": "Continue with phone number",
+    "otpNote": "We send a one-time code by SMS. No password to remember.",
+    "maker": "Are you a maker? Open your shop"
+  },
+  "phone": {
+    "title": "Your phone number",
+    "subtitle": "We will send a 6-digit code to this number.",
+    "label": "Mobile number",
+    "invalid": "Enter a 10-digit Indian mobile number.",
+    "send": "Send code",
+    "consent": "By continuing you agree to the Terms and the Privacy Policy."
+  },
+  "verify": {
+    "title": "Enter the code",
+    "subtitle": "Sent to {{phone}}.",
+    "label": "6-digit code",
+    "invalid": "Enter the 6 digits from the SMS.",
+    "verify": "Verify and continue",
+    "changeNumber": "Change number",
+    "devHint": "Development mode: no SMS is sent. Use code 123456."
+  },
+  "errors": {
+    "network": "Could not reach {{app}}. Check your internet and try again.",
+    "wrongCode": "That code did not work. Check it and try again.",
+    "tooMany": "Too many attempts. Please wait a minute and try again.",
+    "generic": "Something went wrong. Please try again."
+  },
+  "tabs": {
+    "home": "Home",
+    "discover": "Discover",
+    "create": "Create",
+    "orders": "Orders",
+    "profile": "Profile"
+  },
+  "home": {
+    "greeting": "Hello, {{name}}",
+    "comingSoon": "Makers near you will show here soon."
+  },
+  "discover": { "title": "Discover", "comingSoon": "Search by category and place is coming next." },
+  "create": {
+    "title": "Create",
+    "buyerTitle": "Open your shop",
+    "buyerBody": "Sell your cakes, crafts and plants to buyers nearby. Our team will help you set up.",
+    "sellerBody": "Add a product with photos. Coming next."
+  },
+  "orders": { "title": "Orders", "empty": "Your orders will show here." },
+  "profile": {
+    "title": "Profile",
+    "phone": "Phone",
+    "language": "Language",
+    "signOut": "Sign out"
+  },
+  "language": { "ta": "தமிழ்", "en": "English", "taLabel": "Tamil", "enLabel": "English" },
+  "a11y": { "back": "Go back", "create": "Create a post or product" }
+}

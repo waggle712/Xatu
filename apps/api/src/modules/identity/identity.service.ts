@@ -47,6 +47,15 @@ export class IdentityService {
       // Firebase has just proven ownership of this phone number, so link an existing
       // account with the same phone (e.g. a maker onboarded by the team) to this Firebase user.
       const byPhone = await tx.user.findUnique({ where: { phone: identity.phone } });
+      if (byPhone && env.AUTH_DEV_BYPASS && !/^(dev|seed)-/.test(byPhone.firebaseUid)) {
+        // The development login proves nothing about the phone, so it may never take over
+        // an account that belongs to a real Firebase user.
+        throw new AppError(
+          'invalid_firebase_token',
+          'Development login cannot use this number.',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
       if (byPhone) {
         const linked = await tx.user.update({
           where: { id: byPhone.id },
