@@ -4,7 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 
-// Needs the local database: pnpm db:up
+// Runs against Testcontainers (see test/global-setup.ts).
 describe('API (e2e)', () => {
   let app: INestApplication;
 

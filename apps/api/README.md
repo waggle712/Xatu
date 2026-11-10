@@ -14,7 +14,7 @@ pnpm --filter api dev           # http://localhost:3000
 
 - Health check: `GET /health`
 - OpenAPI docs: `/docs` (JSON at `/docs/openapi.json`)
-- Tests: `pnpm --filter api test` (unit), `pnpm --filter api test:e2e` (needs the database)
+- Tests: `pnpm --filter api test` (unit), `pnpm --filter api test:e2e` (integration; starts Postgres and Redis in Testcontainers, needs Docker)
 
 ## Layout
 
@@ -39,3 +39,12 @@ prisma/
 - Money is integer paise. Database `CHECK` constraints back this up.
 - `ledger_entries` is append-only (a trigger blocks UPDATE/DELETE); corrections are reversing entries.
 - Schema changes: edit `schema.prisma`, run `pnpm --filter api db:migrate --name <change>`, review the SQL, commit it.
+
+## Docker
+
+```bash
+docker build -f apps/api/Dockerfile -t xatu-api .                  # runtime image (from the repo root)
+docker build -f apps/api/Dockerfile --target migrate -t xatu-api:migrate .
+```
+
+Deployment: see [docs/deploy.md](../../docs/deploy.md).

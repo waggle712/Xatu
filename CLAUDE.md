@@ -14,24 +14,24 @@ Screen designs: https://claude.ai/artifact/Y7L5zjTS2xeLx6sVuj5cmx
 
 ## Stack (decided — do not swap without asking)
 
-| Layer         | Choice                                                                            |
-| ------------- | --------------------------------------------------------------------------------- |
-| Monorepo      | pnpm workspaces + Turborepo                                                       |
-| Language      | TypeScript everywhere, `strict: true`                                             |
-| Mobile        | React Native + Expo (dev builds, not Expo Go), Expo Router, EAS Build             |
-| App data      | TanStack Query (server state), Zustand (local state)                              |
-| Lists / media | FlashList, expo-image, expo-video                                                 |
-| i18n          | i18next, `ta` and `en` from day one; no hard-coded UI strings                     |
-| Backend       | Node.js + NestJS modular monolith, REST + OpenAPI                                 |
-| Validation    | zod schemas in `packages/shared`, used by app and API                             |
-| Database      | PostgreSQL 16 (+ PostGIS, pg_trgm), Prisma migrations                             |
-| Cache / jobs  | Redis + BullMQ                                                                    |
-| Auth          | Firebase phone OTP → API verifies token → issues own JWT + refresh token          |
-| Media         | Cloudflare R2 + Images (photos), Cloudflare Stream (reels), signed direct uploads |
-| Payments      | Razorpay (Orders, Checkout SDK, webhooks; Route with on-hold transfers later)     |
-| Admin         | Next.js app in `apps/admin`                                                       |
-| Hosting       | AWS Mumbai (ap-south-1): App Runner/ECS, RDS, ElastiCache                         |
-| Monitoring    | Sentry, PostHog (events + feature flags)                                          |
+| Layer         | Choice                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| Monorepo      | pnpm workspaces + Turborepo                                                                  |
+| Language      | TypeScript everywhere, `strict: true`                                                        |
+| Mobile        | React Native + Expo (dev builds, not Expo Go), Expo Router, EAS Build                        |
+| App data      | TanStack Query (server state), Zustand (local state)                                         |
+| Lists / media | FlashList, expo-image, expo-video                                                            |
+| i18n          | i18next, `ta` and `en` from day one; no hard-coded UI strings                                |
+| Backend       | Node.js + NestJS modular monolith, REST + OpenAPI                                            |
+| Validation    | zod schemas in `packages/shared`, used by app and API                                        |
+| Database      | PostgreSQL 16 (+ PostGIS, pg_trgm), Prisma migrations                                        |
+| Cache / jobs  | Redis + BullMQ                                                                               |
+| Auth          | Firebase phone OTP → API verifies token → issues own JWT + refresh token                     |
+| Media         | Cloudflare R2 + Images (photos), Cloudflare Stream (reels), signed direct uploads            |
+| Payments      | Razorpay (Orders, Checkout SDK, webhooks; Route with on-hold transfers later)                |
+| Admin         | Next.js app in `apps/admin`                                                                  |
+| Hosting       | AWS Mumbai (ap-south-1): ECS Express Mode (Fargate), RDS, ElastiCache — see `docs/deploy.md` |
+| Monitoring    | Sentry, PostHog (events + feature flags)                                                     |
 
 ## Repo layout
 

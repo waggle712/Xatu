@@ -1,0 +1,18 @@
+# Keep the build context small and free of secrets.
+.git
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/src/generated
+apps/mobile/*
+!apps/mobile/package.json
+apps/admin/*
+!apps/admin/package.json
+packages/ui/*
+!packages/ui/package.json
+docs
+infra

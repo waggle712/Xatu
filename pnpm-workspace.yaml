@@ -32,3 +32,5 @@ allowBuilds:
   '@firebase/util': false
   protobufjs: false
   '@parcel/watcher': false
+  cpu-features: false
+  ssh2: false
