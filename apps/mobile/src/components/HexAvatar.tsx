@@ -31,6 +31,7 @@ export function HexAvatar({ name, size = 92 }: { name: string; size?: number }) 
       <Text
         variant="title"
         color="onBrand"
+        maxFontSizeMultiplier={1}
         style={{ fontSize: size * 0.3, lineHeight: size * 0.37 }}
       >
         {initials(name)}

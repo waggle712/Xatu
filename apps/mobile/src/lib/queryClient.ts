@@ -1,5 +1,5 @@
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { defaultShouldDehydrateQuery, type Query, QueryClient } from '@tanstack/react-query';
+import { type Query, QueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import {
   deleteAsync,
@@ -17,9 +17,10 @@ export const queryClient = new QueryClient({
 const PERSISTED_ROOTS = new Set(['feed', 'categories']);
 
 export function shouldPersist(query: Query): boolean {
-  return (
-    PERSISTED_ROOTS.has(String(query.queryKey[0])) && defaultShouldDehydrateQuery(query) // successful queries only
-  );
+  // Keep any query that has data, even if its latest refresh failed: a failed refresh while
+  // offline marks the query as `error` but keeps the old data, and that data is exactly what
+  // the next offline start should show.
+  return PERSISTED_ROOTS.has(String(query.queryKey[0])) && query.state.data !== undefined;
 }
 
 /** A tiny key-value store in one JSON file per key (no native module needed). */

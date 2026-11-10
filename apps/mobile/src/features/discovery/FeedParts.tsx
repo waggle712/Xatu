@@ -34,6 +34,11 @@ export function prefetchCards(items: FeedItem[], width: number): void {
   if (urls.length) void Image.prefetch(urls);
 }
 
+/** Shops are placed to about 1 km, so anything closer just says "under 1 km". */
+export function distanceText(km: number, t: TFunction): string {
+  return km < 1 ? t('feed.kmNear') : t('feed.km', { km });
+}
+
 export function itemTitle(item: Pick<FeedItem, 'title' | 'titleTa'>, language: string): string {
   return language === 'ta' ? item.titleTa || item.title : item.title;
 }
@@ -71,20 +76,20 @@ export const FeedCard = memo(function FeedCard({
     <View style={{ gap: theme.space[2], paddingBottom: theme.space[6] }}>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={`${item.maker.businessName}, ${place}, ${t('feed.km', { km: item.distanceKm })}`}
+        accessibilityLabel={`${item.maker.businessName}, ${place}, ${distanceText(item.distanceKm, t)}`}
         onPress={() => router.push(`/s/${item.maker.handle}`)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[3], minHeight: 48 }}
       >
         <HexAvatar name={item.maker.businessName} size={40} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[1] }}>
-            <Text variant="heading" numberOfLines={1} style={{ flexShrink: 1 }}>
+            <Text variant="heading" numberOfLines={2} style={{ flexShrink: 1 }}>
               {item.maker.businessName}
             </Text>
             {item.maker.verified ? <VerifiedIcon size={18} color={theme.colors.sage} /> : null}
           </View>
-          <Text variant="caption" color="inkMuted" numberOfLines={1}>
-            {place} · {t('feed.km', { km: item.distanceKm })}
+          <Text variant="caption" color="inkMuted" numberOfLines={2}>
+            {place} · {distanceText(item.distanceKm, t)}
           </Text>
         </View>
       </Pressable>
@@ -218,12 +223,17 @@ export function MakerRow({ makers }: { makers: NearbyMaker[] }) {
           <Pressable
             key={m.handle}
             accessibilityRole="link"
-            accessibilityLabel={`${m.businessName}, ${t('feed.km', { km: m.distanceKm })}`}
+            accessibilityLabel={`${m.businessName}, ${distanceText(m.distanceKm, t)}`}
             onPress={() => router.push(`/s/${m.handle}`)}
             style={{ width: 76, alignItems: 'center', gap: theme.space[1] }}
           >
             <HexAvatar name={m.businessName} size={64} />
-            <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center' }}>
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.4}
+              style={{ textAlign: 'center' }}
+            >
               {m.businessName.split(' ')[0]}
             </Text>
           </Pressable>

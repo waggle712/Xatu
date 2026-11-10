@@ -8,6 +8,7 @@
  *   BENCH_DATABASE_URL=postgresql://xatu:...@localhost:5434/xatu_bench pnpm --filter api bench:feed
  */
 import { randomUUID } from 'node:crypto';
+import type { Redis } from 'ioredis';
 
 const benchUrl = process.env.BENCH_DATABASE_URL;
 if (!benchUrl || !/bench/.test(benchUrl)) {
@@ -47,7 +48,7 @@ async function main() {
   await app.listen(0);
   const base = await app.getUrl();
   const prisma = app.get(PrismaService);
-  const redis = app.get(REDIS) as import('ioredis').Redis;
+  const redis = app.get<Redis>(REDIS);
   // Every request comes from one IP here; reset the per-IP limits so they don't stop the run.
   const clearLimits = async () => {
     const keys = await redis.keys(`${RATE_LIMIT_KEY_PREFIX}discovery:*`);

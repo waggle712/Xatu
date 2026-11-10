@@ -375,6 +375,7 @@
     "locationDenied": "Location is off for this app. You can turn it on in Settings.",
     "emptyTitle": "Nothing nearby yet",
     "emptyBody": "No makers have listed products near you yet. Check back soon.",
-    "emptyCategory": "Nothing in this category nearby yet. Try Near me."
+    "emptyCategory": "Nothing in this category nearby yet. Try Near me.",
+    "kmNear": "under 1 km"
   }
 }
