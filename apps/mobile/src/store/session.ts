@@ -1,6 +1,8 @@
 import type { AuthSession, Language, Me } from '@xatu/shared';
 import { create } from 'zustand';
+import { identifyUser, resetAnalytics } from '../lib/analytics';
 import { setLanguage } from '../lib/i18n';
+import { setSentryUser } from '../lib/sentry';
 import { readSecure, writeSecure } from '../lib/secure';
 
 type Status = 'loading' | 'signedOut' | 'signedIn';
@@ -46,10 +48,13 @@ export const useSession = create<SessionState>((set) => ({
     } catch {
       user = null;
     }
+    if (refreshToken && user) setSentryUser(user.id);
     set({ status: refreshToken && user ? 'signedIn' : 'signedOut', user });
   },
 
   signIn: async (session) => {
+    identifyUser(session.user.id, session.user.language);
+    setSentryUser(session.user.id);
     await writeSecure('refreshToken', session.refreshToken);
     await writeSecure('user', JSON.stringify(session.user));
     set({
@@ -71,6 +76,8 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   signOut: async () => {
+    resetAnalytics();
+    setSentryUser(null);
     await writeSecure('refreshToken', null);
     await writeSecure('user', null);
     set({ status: 'signedOut', user: null, accessToken: null, accessTokenExpiresAt: 0 });

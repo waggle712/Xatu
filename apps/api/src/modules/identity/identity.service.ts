@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { AuthSession, CreateSessionRequest, Me } from '@xatu/shared';
+import { AnalyticsService } from '../../analytics/analytics.service.js';
 import { AppError } from '../../common/errors.js';
 import { env } from '../../config/env.js';
 import type { Prisma, User } from '../../generated/prisma/client.js';
@@ -22,6 +23,7 @@ export class IdentityService {
     private readonly prisma: PrismaService,
     private readonly firebase: FirebaseVerifier,
     private readonly tokens: TokenService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   /** Exchanges a Firebase phone-auth ID token for a Xatu session, creating the user if new. */
@@ -82,6 +84,7 @@ export class IdentityService {
     });
 
     this.assertCanSignIn(user);
+    if (isNewUser) this.analytics.capture(user.id, 'buyer_signed_up', { language: user.language });
     const full = await this.loadUser(user.id);
     return this.issueSession(full, { deviceName: input.deviceName, ...client }, isNewUser);
   }

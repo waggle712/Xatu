@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { Response } from 'express';
 import { type ApiErrorBody, AppError } from './errors.js';
 
@@ -29,6 +30,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const { status, body } = this.toBody(exception);
     if (status >= 500) {
       this.logger.error(exception instanceof Error ? exception.stack : String(exception));
+      Sentry.captureException(exception);
     }
     res.status(status).json(body);
   }
