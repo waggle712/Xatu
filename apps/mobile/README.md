@@ -51,6 +51,20 @@ Without a Mac build: `npx eas-cli build --profile development --platform android
 
 Needs Xcode with the iOS platform (`xcodebuild -downloadPlatform iOS`), then `pnpm --filter mobile ios`.
 
+## Feature flags in development
+
+Features ship behind PostHog flags. Without PostHog, turn them on locally in `apps/mobile/.env`:
+
+```
+EXPO_PUBLIC_FLAG_OVERRIDES=seller_onboarding
+```
+
+Restart Metro after changing `.env`. Overrides are ignored in release builds.
+
+## Maps
+
+The shop pickup picker uses Apple Maps on iOS. On Android it needs `GOOGLE_MAPS_ANDROID_API_KEY` (Maps SDK for Android, restricted to `in.xatu.app`) at build time; without it the screen offers "Use my current location" instead of a map.
+
 ## Login modes
 
 - **Development** (default): with no Firebase files, no SMS is sent. Any Indian mobile number and code **123456** sign in, through the API's `AUTH_DEV_BYPASS`. The code screen says so.

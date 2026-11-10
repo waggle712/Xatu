@@ -37,6 +37,15 @@ enum AccountStatus {
   suspended
 }
 
+/// Shop lifecycle. Owners submit, pause and resume; admins approve, suspend and reinstate.
+enum SellerStatus {
+  draft
+  kyc_pending
+  active
+  paused
+  suspended
+}
+
 enum VerificationStatus {
   unverified
   pending
@@ -231,19 +240,29 @@ model SellerProfile {
   userId             String                                 @unique @map("user_id") @db.Uuid
   handle             String                                 @unique @db.Citext
   businessName       String                                 @map("business_name")
-  bio                String?
+  storyEn            String?                                @map("story_en")
+  storyTa            String?                                @map("story_ta")
   categoryId         String?                                @map("category_id") @db.Uuid
+  /// Public locality shown to buyers, e.g. "Woraiyur".
+  areaName           String?                                @map("area_name")
   city               String
   region             String                                 @default("IN-TN")
-  pincode            String
-  /// PostGIS point (WGS 84). Written with raw SQL; Prisma treats it as opaque.
+  pincode            String?
+  /// Exact pickup point (PostGIS, WGS 84). PRIVATE: public views only get a rounded location.
   location           Unsupported("geography(Point, 4326)")?
+  /// PRIVATE: shown to the owner, and to a buyer only after their order is accepted.
+  pickupAddressLine  String?                                @map("pickup_address_line")
+  pickupLandmark     String?                                @map("pickup_landmark")
+  /// Weekly hours in IST, validated by openingHoursSchema in @xatu/shared.
+  openingHours       Json                                   @default("{}") @map("opening_hours")
+  coverMediaKey      String?                                @map("cover_media_key")
   pickupAvailable    Boolean                                @default(true) @map("pickup_available")
   localDelivery      Boolean                                @default(false) @map("local_delivery")
   courierAvailable   Boolean                                @default(false) @map("courier_available")
   verificationStatus VerificationStatus                     @default(unverified) @map("verification_status")
   verifiedAt         DateTime?                              @map("verified_at")
-  status             AccountStatus                          @default(active)
+  status             SellerStatus                           @default(draft)
+  submittedAt        DateTime?                              @map("submitted_at")
   createdAt          DateTime                               @default(now()) @map("created_at")
   updatedAt          DateTime                               @updatedAt @map("updated_at")
 

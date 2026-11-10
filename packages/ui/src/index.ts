@@ -5,3 +5,6 @@ export * from './components/Text.tsx';
 export * from './components/Button.tsx';
 export * from './icons/XatuMark.tsx';
 export * from './icons/TrustIcons.tsx';
+export * from './components/Chip.tsx';
+export * from './components/TrustBadge.tsx';
+export * from './components/Toggle.tsx';

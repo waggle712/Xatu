@@ -45,7 +45,7 @@ export default function PhoneScreen() {
       <Text color="inkMuted">{t('phone.subtitle')}</Text>
       <TextField
         label={t('phone.label')}
-        value={number}
+        defaultValue=""
         // Keep the raw text while typing (rewriting it per keystroke can reorder fast input);
         // toIndianE164 cleans and validates it on submit.
         onChangeText={(v) => {

@@ -31,7 +31,20 @@
     "network": "Could not reach {{app}}. Check your internet and try again.",
     "wrongCode": "That code did not work. Check it and try again.",
     "tooMany": "Too many attempts. Please wait a minute and try again.",
-    "generic": "Something went wrong. Please try again."
+    "generic": "Something went wrong. Please try again.",
+    "codes": {
+      "handle_taken": "This shop link is taken. Try another.",
+      "shop_exists": "You already have a shop.",
+      "shop_incomplete": "Fill in the missing details first.",
+      "shop_suspended": "This shop is suspended. Contact {{app}} support.",
+      "shop_changed": "The shop changed. Pull down to refresh and try again.",
+      "invalid_shop_status": "That can't be done in the shop's current status.",
+      "forbidden": "You can only manage your own shop.",
+      "validation_failed": "Some details are missing or not valid.",
+      "rate_limited": "Too many attempts. Please wait and try again.",
+      "shop_not_found": "This shop isn't available.",
+      "category_not_found": "Choose a category from the list."
+    }
   },
   "tabs": {
     "home": "Home",
@@ -44,20 +57,144 @@
     "greeting": "Hello, {{name}}",
     "comingSoon": "Makers near you will show here soon."
   },
-  "discover": { "title": "Discover", "comingSoon": "Search by category and place is coming next." },
+  "discover": {
+    "title": "Discover",
+    "comingSoon": "Search by category and place is coming next."
+  },
   "create": {
     "title": "Create",
     "buyerTitle": "Open your shop",
     "buyerBody": "Sell your cakes, crafts and plants to buyers nearby. Our team will help you set up.",
     "sellerBody": "Add a product with photos. Coming next."
   },
-  "orders": { "title": "Orders", "empty": "Your orders will show here." },
+  "orders": {
+    "title": "Orders",
+    "empty": "Your orders will show here."
+  },
   "profile": {
     "title": "Profile",
     "phone": "Phone",
     "language": "Language",
     "signOut": "Sign out"
   },
-  "language": { "ta": "தமிழ்", "en": "English", "taLabel": "Tamil", "enLabel": "English" },
-  "a11y": { "back": "Go back", "create": "Create a post or product" }
+  "language": {
+    "ta": "தமிழ்",
+    "en": "English",
+    "taLabel": "Tamil",
+    "enLabel": "English"
+  },
+  "a11y": {
+    "back": "Go back",
+    "create": "Create a post or product"
+  },
+  "states": {
+    "loading": "Loading",
+    "errorTitle": "Couldn't load this",
+    "retry": "Try again",
+    "offline": "You're offline. Showing what was saved; changes will need internet."
+  },
+  "shop": {
+    "open": "Open your shop",
+    "openBody": "Sell what you make to buyers nearby. It's free to set up.",
+    "my": "My shop",
+    "viewPublic": "See how buyers see it",
+    "new": {
+      "title": "Open your shop",
+      "name": "Shop name",
+      "namePlaceholder": "Meena Clay Studio",
+      "handle": "Shop link",
+      "handleHint": "Lowercase letters, numbers and _ only",
+      "handleAvailable": "Available",
+      "handleTaken": "Taken",
+      "category": "What do you make?",
+      "create": "Create shop",
+      "step": "Step {{n}} of {{total}}"
+    },
+    "status": {
+      "draft": "Draft: finish your shop and send it for review.",
+      "kyc_pending": "In review: our team will check your shop and call you.",
+      "active": "Live: buyers can see your shop.",
+      "paused": "Paused: buyers can see your shop but can't order.",
+      "suspended": "Suspended: contact {{app}} support."
+    },
+    "checklist": {
+      "title": "Still needed",
+      "category": "Category",
+      "story": "Your story",
+      "area": "Area",
+      "pickup_address": "Pickup address",
+      "location": "Pickup point on the map",
+      "opening_hours": "Opening hours"
+    },
+    "sections": {
+      "details": "Name, category and story",
+      "location": "Pickup area and address",
+      "hours": "Opening hours"
+    },
+    "submit": "Send for review",
+    "pause": "Pause shop",
+    "resume": "Resume shop",
+    "details": {
+      "title": "Shop details",
+      "storyEn": "Your story (English)",
+      "storyTa": "Your story (Tamil)",
+      "storyHint": "Who you are and how you make it. Up to 600 characters.",
+      "pickup": "Buyers can pick up from me",
+      "localDelivery": "I deliver nearby"
+    },
+    "location": {
+      "title": "Pickup area",
+      "mapHint": "Move the map so the pin sits on your pickup point.",
+      "useCurrent": "Use my current location",
+      "locating": "Finding you…",
+      "permissionDenied": "Location permission is off. You can still type your area and pincode.",
+      "noMap": "Map isn't set up on this build. Use your current location instead.",
+      "pointSet": "Pickup point set",
+      "area": "Area (shown to buyers)",
+      "areaPlaceholder": "Woraiyur",
+      "pincode": "Pincode",
+      "address": "Pickup address (private)",
+      "addressHint": "Only shown to a buyer after you accept their order.",
+      "landmark": "Landmark (private)",
+      "privacy": "Buyers only see your area, never your exact address."
+    },
+    "hours": {
+      "title": "Opening hours",
+      "closed": "Closed",
+      "open": "Open",
+      "addRange": "Add hours",
+      "remove": "Remove",
+      "from": "From",
+      "to": "To",
+      "invalid": "Check the times: closing must be after opening and times can't overlap.",
+      "days": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    },
+    "save": "Save",
+    "saved": "Saved",
+    "public": {
+      "verified": "Verified maker",
+      "pickup": "Pickup",
+      "localDelivery": "Local delivery",
+      "products": "Products",
+      "completed": "Completed orders",
+      "hours": "Hours",
+      "story": "About",
+      "paused": "This shop is taking a break. You can't order right now.",
+      "shopTab": "Shop",
+      "reviewsTab": "Reviews",
+      "noProducts": "No products yet",
+      "noProductsBody": "This maker hasn't listed anything yet. Check back soon.",
+      "noReviews": "No reviews yet",
+      "noReviewsBody": "Reviews come only from buyers who completed an order.",
+      "approx": "approx. area"
+    }
+  }
 }

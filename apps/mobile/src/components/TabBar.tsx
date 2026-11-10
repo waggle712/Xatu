@@ -85,6 +85,8 @@ export function TabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
             <Icon size={24} strokeWidth={1.75} color={color} />
             <Text
               variant="caption"
+              // Tab labels scale a little; past that the bar would truncate them (as iOS tab bars do).
+              maxFontSizeMultiplier={1.3}
               style={{
                 color,
                 fontFamily: focused ? 'HindMadurai_600SemiBold' : 'HindMadurai_500Medium',
