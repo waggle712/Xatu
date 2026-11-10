@@ -17,10 +17,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { initSentry, Sentry } from '../src/lib/sentry';
+import { setupOnlineManager } from '../src/lib/network';
+import { initSentry, withSentry } from '../src/lib/sentry';
 import { useSession } from '../src/store/session';
 
 initSentry();
+setupOnlineManager();
 void SplashScreen.preventAutoHideAsync();
 
 function RootLayout() {
@@ -74,6 +76,8 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
       >
         <Stack.Protected guard={signedIn}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="shop" />
+          <Stack.Screen name="s/[handle]" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />
@@ -83,4 +87,4 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default withSentry(RootLayout);

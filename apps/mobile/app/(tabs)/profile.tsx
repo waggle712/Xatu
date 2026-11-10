@@ -3,7 +3,11 @@ import { Button, Text, useTheme } from '@xatu/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { router } from 'expo-router';
+import { SectionRow } from '../../src/components/Rows';
 import { Screen } from '../../src/components/Screen';
+import { useMyShop } from '../../src/features/shop/api';
+import { useFeatureFlag } from '../../src/lib/analytics';
 import { logout } from '../../src/features/auth/api';
 import { formatIndianPhone } from '../../src/lib/phone';
 import { useSession } from '../../src/store/session';
@@ -15,6 +19,8 @@ export default function ProfileScreen() {
   const language = useSession((s) => s.language);
   const chooseLanguage = useSession((s) => s.chooseLanguage);
   const [signingOut, setSigningOut] = useState(false);
+  const sellerOnboarding = useFeatureFlag('seller_onboarding');
+  const myShop = useMyShop();
 
   return (
     <Screen>
@@ -36,6 +42,15 @@ export default function ProfileScreen() {
         </Text>
         <Text variant="heading">{user ? formatIndianPhone(user.phone) : ''}</Text>
       </View>
+
+      {myShop.data ? (
+        <SectionRow
+          label={`${t('shop.my')} · ${myShop.data.businessName}`}
+          onPress={() => router.push('/shop')}
+        />
+      ) : sellerOnboarding && myShop.isSuccess ? (
+        <SectionRow label={t('shop.open')} onPress={() => router.push('/shop/new')} />
+      ) : null}
 
       <View style={{ gap: theme.space[2] }}>
         <Text variant="label" color="inkMuted">

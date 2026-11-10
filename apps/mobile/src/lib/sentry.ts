@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import type React from 'react';
 import Constants from 'expo-constants';
 
 const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
@@ -31,6 +32,11 @@ export function initSentry(): void {
 export function setSentryUser(userId: string | null): void {
   if (!dsn) return;
   Sentry.setUser(userId ? { id: userId } : null);
+}
+
+/** Wraps the root component for Sentry only when it is enabled (avoids a dev warning). */
+export function withSentry(component: () => React.JSX.Element | null): React.ComponentType {
+  return dsn ? Sentry.wrap(component) : component;
 }
 
 export { Sentry };

@@ -20,7 +20,8 @@ export function Screen({
       >
         <ScrollView
           contentContainerStyle={[styles.content, { padding: theme.space[4], gap: theme.space[6] }]}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
         >
           <View style={{ gap: theme.space[4], flexGrow: 1 }}>{children}</View>
         </ScrollView>

@@ -38,3 +38,26 @@ export function ProtectedPayIcon({ size = 24, color }: IconProps) {
     </Svg>
   );
 }
+
+export function NearMeIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"
+        stroke={color}
+        {...stroke}
+      />
+      <Path d="M12 7.7a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6z" stroke={color} {...stroke} />
+    </Svg>
+  );
+}
+
+export function PickupSlotIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M5 8h14l-1 12H6z" stroke={color} {...stroke} />
+      <Path d="M9 8V6.5a3 3 0 0 1 6 0V8" stroke={color} {...stroke} />
+      <Path d="M12 12v2.5l1.6 1" stroke={color} {...stroke} />
+    </Svg>
+  );
+}

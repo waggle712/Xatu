@@ -52,12 +52,26 @@ export function resetAnalytics(): void {
   }
 }
 
-/** Typed feature flag. Off by default, and always off without PostHog. */
+/**
+ * Development only: EXPO_PUBLIC_FLAG_OVERRIDES="seller_onboarding,checkout" turns flags on
+ * locally without PostHog. Ignored in release builds.
+ */
+const devOverrides = new Set(
+  __DEV__
+    ? (process.env.EXPO_PUBLIC_FLAG_OVERRIDES ?? '')
+        .split(',')
+        .map((f) => f.trim())
+        .filter(Boolean)
+    : [],
+);
+
+/** Typed feature flag. Off by default, and always off without PostHog (except dev overrides). */
 export const useFeatureFlag: (flag: FeatureFlag) => boolean = posthog
   ? (flag) => {
       const value = usePostHogFlag(FEATURE_FLAGS[flag].key, posthog ?? undefined);
+      if (devOverrides.has(flag)) return true;
       return value === undefined
         ? FEATURE_FLAGS[flag].default
         : value === true || typeof value === 'string';
     }
-  : (flag) => FEATURE_FLAGS[flag].default;
+  : (flag) => devOverrides.has(flag) || FEATURE_FLAGS[flag].default;

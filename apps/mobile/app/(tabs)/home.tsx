@@ -21,7 +21,9 @@ export default function HomeScreen() {
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
         <XatuMark size={28} />
-        <Text variant="title">{APP_NAME.toLowerCase()}</Text>
+        <Text variant="title" maxFontSizeMultiplier={1.4}>
+          {APP_NAME.toLowerCase()}
+        </Text>
       </View>
       <Text variant="title" accessibilityRole="header">
         {t('home.greeting', { name })}

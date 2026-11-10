@@ -12,6 +12,10 @@ const hasFirebase = existsSync(androidFirebase) && existsSync(iosFirebase);
 
 const BUNDLE_ID = 'in.xatu.app';
 
+// Google Maps on Android needs an API key (Maps SDK for Android, restricted to this app).
+// Without it the pickup picker falls back to "use my current location". iOS uses Apple Maps.
+const googleMapsAndroidKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY ?? '';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: APP_NAME,
@@ -34,6 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
+    ...(googleMapsAndroidKey ? { config: { googleMaps: { apiKey: googleMapsAndroidKey } } } : {}),
     ...(hasFirebase ? { googleServicesFile: './google-services.json' } : {}),
   },
   web: {
@@ -43,6 +48,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-secure-store',
     'expo-localization',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Your location is used to set your shop pickup point. Buyers only see your area.',
+      },
+    ],
+    ['expo-maps', { requestLocationPermission: true }],
     // Native crash reporting. Source maps upload only when SENTRY_AUTH_TOKEN is set (EAS secrets).
     [
       '@sentry/react-native/expo',
@@ -75,5 +88,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     /** 'firebase' when the native Firebase files are present, otherwise 'dev' (API AUTH_DEV_BYPASS). */
     authMode: hasFirebase ? 'firebase' : 'dev',
+    googleMapsConfigured: googleMapsAndroidKey !== '',
   },
 });
