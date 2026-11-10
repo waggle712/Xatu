@@ -1,9 +1,10 @@
 import type { Language } from '@xatu/shared';
 import { APP_NAME, PILOT_CITY } from '@xatu/config/brand';
 import { Button, ProtectedPayIcon, Text, useTheme, VerifiedIcon, XatuMark } from '@xatu/ui';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Check, Smartphone, Star } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,14 @@ export default function Welcome() {
   const language = useSession((s) => s.language);
   const chooseLanguage = useSession((s) => s.chooseLanguage);
   const c = theme.colors;
+  // Only while this screen is in front, so the next screens get dark status bar text again.
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
 
   return (
     <ScrollView
@@ -24,8 +33,10 @@ export default function Welcome() {
       contentContainerStyle={{ flexGrow: 1 }}
       bounces={false}
     >
+      {/* Light status bar text on the plum hero. */}
+      {focused ? <StatusBar style="light" /> : null}
       <View style={[styles.hero, { backgroundColor: c.plum, paddingTop: insets.top + 24 }]}>
-        <View style={styles.honeycomb}>
+        <View style={[styles.honeycomb, { top: insets.top + 8 }]}>
           <Honeycomb width={160} />
         </View>
         <View
@@ -187,7 +198,7 @@ function TrustRow({ icon, label }: { icon: ReactNode; label: string }) {
 
 const styles = StyleSheet.create({
   hero: { minHeight: 400, paddingHorizontal: 24, paddingBottom: 56, overflow: 'hidden' },
-  honeycomb: { position: 'absolute', right: -10, top: 24 },
+  honeycomb: { position: 'absolute', right: -10 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   wordmark: { fontSize: 30, lineHeight: 36, letterSpacing: -0.3 },
   sheet: { marginTop: -28, paddingHorizontal: 20, paddingTop: 24, gap: 20, flexGrow: 1 },

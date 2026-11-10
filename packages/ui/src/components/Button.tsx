@@ -45,7 +45,7 @@ export function Button({
       ) : (
         <View style={styles.row}>
           {icon}
-          <Text variant="heading" color={primary ? 'onMarigold' : 'ink'}>
+          <Text variant="heading" color={primary ? 'onMarigold' : 'ink'} style={styles.label}>
             {label}
           </Text>
         </View>
@@ -62,5 +62,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  label: { flexShrink: 1, textAlign: 'center' },
 });
