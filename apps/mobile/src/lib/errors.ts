@@ -31,6 +31,7 @@ const KNOWN_CODES = [
   'fulfilment_not_offered',
   'lead_time_invalid',
   'stock_changed',
+  'invalid_cursor',
 ] as const;
 
 /** Any error → a short message in the person's language. Never shows raw server text. */

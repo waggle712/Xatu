@@ -9,15 +9,22 @@ import {
   NotoSerifTamil_600SemiBold,
   NotoSerifTamil_700Bold,
 } from '@expo-google-fonts/noto-serif-tamil';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { ThemeProvider, useTheme } from '@xatu/ui';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setupOnlineManager } from '../src/lib/network';
+import {
+  cacheBuster,
+  PERSIST_MAX_AGE,
+  persister,
+  queryClient,
+  shouldPersist,
+} from '../src/lib/queryClient';
 import { initSentry, withSentry } from '../src/lib/sentry';
 import { useSession } from '../src/store/session';
 
@@ -26,9 +33,6 @@ setupOnlineManager();
 void SplashScreen.preventAutoHideAsync();
 
 function RootLayout() {
-  const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }),
-  );
   const [fontsLoaded] = useFonts({
     Fraunces_600SemiBold,
     Fraunces_700Bold,
@@ -39,6 +43,7 @@ function RootLayout() {
     HindMadurai_600SemiBold,
   });
   const status = useSession((s) => s.status);
+  const userId = useSession((s) => s.user?.id);
   const restore = useSession((s) => s.restore);
 
   useEffect(() => {
@@ -55,9 +60,17 @@ function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister,
+            maxAge: PERSIST_MAX_AGE,
+            buster: cacheBuster(userId),
+            dehydrateOptions: { shouldDehydrateQuery: shouldPersist },
+          }}
+        >
           <RootStack signedIn={status === 'signedIn'} />
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
