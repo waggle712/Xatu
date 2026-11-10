@@ -4,6 +4,7 @@ import {
   canTransitionSeller,
   type Category,
   type CreateShopRequest,
+  type FulfilmentMode,
   missingForSubmit,
   type MyShop,
   type OpeningHours,
@@ -214,6 +215,50 @@ export class ProfilesService {
     };
   }
 
+  // ── Used by other modules (catalog) instead of reading seller_profiles directly ──
+
+  /** The caller's shop with what catalog needs: status and the delivery modes it offers. */
+  async ownerShop(userId: string): Promise<OwnerShop | null> {
+    const shop = await this.prisma.sellerProfile.findUnique({ where: { userId } });
+    if (!shop) return null;
+    return {
+      id: shop.id,
+      status: shop.status,
+      categoryId: shop.categoryId,
+      offeredModes: offeredModes(shop),
+    };
+  }
+
+  /** Buyer-safe maker summaries for shops buyers may see, keyed by seller id. */
+  async publicSellers(sellerIds: string[]): Promise<Map<string, PublicSellerSummary>> {
+    const shops = await this.prisma.sellerProfile.findMany({
+      where: { id: { in: sellerIds }, status: { in: [...PUBLIC_SELLER_STATUSES] } },
+    });
+    return new Map(
+      shops.map((shop) => [
+        shop.id,
+        {
+          handle: shop.handle,
+          businessName: shop.businessName,
+          verified: shop.verificationStatus === 'verified',
+          areaName: shop.areaName,
+          city: shop.city,
+          acceptingOrders: shop.status === 'active',
+          offeredModes: offeredModes(shop),
+        },
+      ]),
+    );
+  }
+
+  /** The seller id behind a public shop handle, or null when buyers can't see it. */
+  async publicSellerId(handle: string): Promise<string | null> {
+    const shop = await this.prisma.sellerProfile.findUnique({
+      where: { handle },
+      select: { id: true, status: true },
+    });
+    return shop && PUBLIC_SELLER_STATUSES.includes(shop.status) ? shop.id : null;
+  }
+
   private async transition(userId: string, shop: SellerProfile, to: SellerStatus): Promise<MyShop> {
     if (!canTransitionSeller(shop.status, to, 'owner')) {
       throw new AppError(
@@ -302,6 +347,31 @@ export class ProfilesService {
   ): Promise<void> {
     await tx.outboxEvent.create({ data: { topic, aggregateId, payload } });
   }
+}
+
+export interface OwnerShop {
+  id: string;
+  status: SellerStatus;
+  categoryId: string | null;
+  offeredModes: FulfilmentMode[];
+}
+
+export interface PublicSellerSummary {
+  handle: string;
+  businessName: string;
+  verified: boolean;
+  areaName: string | null;
+  city: string;
+  acceptingOrders: boolean;
+  offeredModes: FulfilmentMode[];
+}
+
+function offeredModes(shop: SellerProfile): FulfilmentMode[] {
+  const modes: FulfilmentMode[] = [];
+  if (shop.pickupAvailable) modes.push('pickup');
+  if (shop.localDelivery) modes.push('local_delivery');
+  if (shop.courierAvailable) modes.push('courier');
+  return modes;
 }
 
 function parseHours(value: unknown): OpeningHours {

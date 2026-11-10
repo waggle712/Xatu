@@ -15,6 +15,22 @@ const KNOWN_CODES = [
   'rate_limited',
   'shop_not_found',
   'category_not_found',
+  'product_not_found',
+  'product_incomplete',
+  'product_archived',
+  'product_changed',
+  'invalid_product_status',
+  'shop_not_active',
+  'shop_required',
+  'photo_required',
+  'photo_in_use',
+  'media_not_ready',
+  'stock_below_reserved',
+  'variant_reserved',
+  'variant_not_found',
+  'fulfilment_not_offered',
+  'lead_time_invalid',
+  'stock_changed',
 ] as const;
 
 /** Any error → a short message in the person's language. Never shows raw server text. */

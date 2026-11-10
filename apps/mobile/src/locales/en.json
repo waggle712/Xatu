@@ -43,7 +43,23 @@
       "validation_failed": "Some details are missing or not valid.",
       "rate_limited": "Too many attempts. Please wait and try again.",
       "shop_not_found": "This shop isn't available.",
-      "category_not_found": "Choose a category from the list."
+      "category_not_found": "Choose a category from the list.",
+      "product_not_found": "This product isn't available.",
+      "product_incomplete": "Fill in the missing details first.",
+      "product_archived": "Restore this product before editing it.",
+      "product_changed": "This product changed. Pull down to refresh and try again.",
+      "invalid_product_status": "That can't be done in the product's current status.",
+      "shop_not_active": "Your shop must be approved before products can go live.",
+      "shop_required": "Open your shop first.",
+      "photo_required": "A live product needs at least one photo.",
+      "photo_in_use": "That photo is already on another product.",
+      "media_not_ready": "The photo is still being processed.",
+      "stock_below_reserved": "Some buyers are checking out right now. Stock can't go lower yet.",
+      "variant_reserved": "Someone is buying this option right now. Try again in a few minutes.",
+      "variant_not_found": "That option was changed. Refresh and try again.",
+      "fulfilment_not_offered": "Turn this delivery option on for your shop first.",
+      "lead_time_invalid": "Days to make are only for made-to-order products.",
+      "stock_changed": "Stock changed since you opened this. Check the new number and try again."
     }
   },
   "tabs": {
@@ -65,7 +81,7 @@
     "title": "Create",
     "buyerTitle": "Open your shop",
     "buyerBody": "Sell your cakes, crafts and plants to buyers nearby. Our team will help you set up.",
-    "sellerBody": "Add a product with photos. Coming next."
+    "sellerBody": "Add products with photos, prices and stock."
   },
   "orders": {
     "title": "Orders",
@@ -223,6 +239,118 @@
       "too_many_pixels": "The photo is too large.",
       "unreadable": "The photo couldn't be read.",
       "processing_failed": "We couldn't process the photo. Try again."
+    }
+  },
+  "catalog": {
+    "products": "Products",
+    "addProduct": "Add a product",
+    "noProducts": "No products yet",
+    "noProductsBody": "Add your first product with a photo. It takes about two minutes.",
+    "untitled": "Untitled draft",
+    "newTitle": "New product",
+    "editTitle": "Edit product",
+    "close": "Close",
+    "stepOf": "Step {{step}} of 3 · {{name}}",
+    "steps": {
+      "photos": "Photos",
+      "details": "Details",
+      "review": "Review"
+    },
+    "next": "Next",
+    "back": "Back",
+    "save": {
+      "pending": "Saving soon…",
+      "saving": "Saving…",
+      "saved": "All changes saved",
+      "error": "Not saved. Check your internet."
+    },
+    "photos": {
+      "title": "Photos of your product",
+      "hint": "Up to 8 photos. The first one is the cover buyers see. Use daylight and a plain background.",
+      "add": "Add photo",
+      "remove": "Remove photo {{n}}",
+      "makeCover": "Make photo {{n}} the cover",
+      "cover": "Cover",
+      "photo": "Photo {{n}} of {{count}}",
+      "max": "You have 8 photos, the most allowed."
+    },
+    "details": {
+      "nameEn": "Name (English)",
+      "nameTa": "Name (Tamil)",
+      "category": "Category",
+      "descriptionEn": "About this product (English)",
+      "descriptionTa": "About this product (Tamil)",
+      "price": "Price (₹)",
+      "inclGst": "incl. GST",
+      "priceInvalid": "Enter a price like 450 or 450.50",
+      "stock": "In stock",
+      "less": "One less",
+      "more": "One more",
+      "options": "Sizes or flavours",
+      "optionsHint": "For different sizes, weights or flavours with their own price.",
+      "optionName": "Option name, e.g. 1 kg",
+      "optionNameTa": "Option name (Tamil)",
+      "addOption": "Add an option",
+      "removeOption": "Remove this option",
+      "madeToOrder": "Made after the order",
+      "madeToOrderHint": "Like cakes or custom henna. Buyers see how many days it takes.",
+      "leadTime": "Ready in (days)",
+      "fulfilment": "How buyers can get it",
+      "modes": {
+        "pickup": "Pickup from me",
+        "local_delivery": "Local delivery",
+        "courier": "Courier"
+      },
+      "optionKind": "Options differ by",
+      "kinds": {
+        "size": "Size",
+        "flavour": "Flavour",
+        "weight": "Weight"
+      },
+      "optionNameMissing": "Name this option"
+    },
+    "review": {
+      "title": "Check and publish",
+      "missing": "Still needed",
+      "problems": {
+        "photo": "At least one photo",
+        "title": "A name (3 letters or more)",
+        "category": "A category",
+        "price": "A price",
+        "lead_time": "How many days it takes to make",
+        "fulfilment": "How buyers can get it"
+      },
+      "ready": "Everything is ready. Buyers will see it right away.",
+      "shopNotActive": "Your shop is being reviewed. You can publish once it's approved.",
+      "publish": "Publish",
+      "pause": "Pause (hide from buyers)",
+      "resume": "Show to buyers again",
+      "archive": "Archive",
+      "restore": "Restore as a draft",
+      "held": "Our team is checking this product. It's hidden from buyers for now.",
+      "published": "Published! Buyers can see it now."
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Live",
+      "paused": "Paused",
+      "archived": "Archived"
+    },
+    "inStock": "{{count}} in stock",
+    "soldOut": "Sold out",
+    "madeToOrderDays_one": "Made to order · ready in {{count}} day",
+    "madeToOrderDays_other": "Made to order · ready in {{count}} days",
+    "from": "from {{price}}",
+    "page": {
+      "handmadeIn": "Handmade in {{city}}",
+      "howToGet": "How you can get it",
+      "chooseOption": "Choose an option",
+      "about": "About this product",
+      "notAccepting": "This shop is taking a short break. Ordering will open again soon.",
+      "notAvailable": "This product isn't available",
+      "notAvailableBody": "It may have sold out or been removed by the maker.",
+      "maker": "Made by {{name}}",
+      "loadMore": "Show more"
     }
   }
 }

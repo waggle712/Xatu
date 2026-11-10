@@ -191,17 +191,26 @@ async function main(): Promise<void> {
 
     for (const [i, p] of s.products.entries()) {
       const sku = `${s.handle}-${i + 1}`;
+      const { pricePaise, stock, ...product } = p;
       await prisma.product.upsert({
         where: { sellerId_sku: { sellerId: profile.id, sku } },
         update: {},
         create: {
-          ...p,
+          ...product,
           sku,
+          variants: {
+            create: {
+              pricePaise: BigInt(pricePaise),
+              stock,
+              movements: { create: { delta: stock, stockAfter: stock, reason: 'listing_created' } },
+            },
+          },
           sellerId: profile.id,
           categoryId: category.id,
           fulfilmentModes: s.localDelivery ? ['pickup', 'local_delivery'] : ['pickup'],
           status: 'active',
           moderationStatus: 'live',
+          publishedAt: new Date(),
         },
       });
     }

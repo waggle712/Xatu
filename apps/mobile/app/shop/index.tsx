@@ -10,6 +10,8 @@ import { CoverPhotoEditor } from '../../src/features/media/CoverPhotoEditor';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { useMyShop, useShopAction } from '../../src/features/shop/api';
+import { SellerProductList } from '../../src/features/catalog/ProductLists';
+import { useFeatureFlag } from '../../src/lib/analytics';
 import { errorMessage } from '../../src/lib/errors';
 
 const DETAILS = ['category', 'story'];
@@ -61,6 +63,7 @@ function ShopDashboard({ shop }: { shop: MyShop }) {
   const error = submit.error ?? pause.error ?? resume.error;
   const missing = shop.missingForSubmit;
   const editable = shop.status !== 'suspended';
+  const catalog = useFeatureFlag('catalog');
   const statusColors = {
     draft: theme.colors.surfaceWarm,
     kyc_pending: theme.colors.surfaceWarm,
@@ -125,6 +128,8 @@ function ShopDashboard({ shop }: { shop: MyShop }) {
           />
         </View>
       ) : null}
+
+      {catalog && shop.status !== 'suspended' ? <SellerProductList /> : null}
 
       {shop.status === 'active' || shop.status === 'paused' ? (
         <SectionRow label={t('shop.viewPublic')} onPress={() => router.push(`/s/${shop.handle}`)} />

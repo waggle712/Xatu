@@ -11,7 +11,9 @@ describe('analytics events', () => {
         'media_upload_succeeded',
         'order_delivered',
         'order_paid',
+        'product_draft_started',
         'product_listed',
+        'product_viewed',
         'seller_signed_up',
       ].sort(),
     );

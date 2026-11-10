@@ -5,11 +5,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Polygon } from 'react-native-svg';
 import { BackButton } from '../../src/components/BackButton';
+import { HexAvatar } from '../../src/components/HexAvatar';
 import { XImage } from '../../src/components/XImage';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
+import { ShopProductGrid } from '../../src/features/catalog/ProductLists';
 import { usePublicShop } from '../../src/features/shop/api';
+import { useFeatureFlag } from '../../src/lib/analytics';
 import { errorMessage } from '../../src/lib/errors';
 import { useSession } from '../../src/store/session';
 
@@ -49,43 +51,12 @@ export default function PublicShopScreen() {
   );
 }
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-}
-
-function HexAvatar({ name }: { name: string }) {
-  const theme = useTheme();
-  return (
-    <View
-      style={{ width: 92, height: 100, alignItems: 'center', justifyContent: 'center' }}
-      accessibilityElementsHidden
-    >
-      <Svg width={92} height={100} viewBox="0 0 92 100" style={{ position: 'absolute' }}>
-        <Polygon
-          points="46,3 88,27 88,73 46,97 4,73 4,27"
-          fill={theme.colors.brandFill}
-          stroke={theme.colors.brandFill}
-          strokeWidth={4}
-          strokeLinejoin="round"
-        />
-      </Svg>
-      <Text variant="title" color="onBrand" style={{ fontSize: 28, lineHeight: 34 }}>
-        {initials(name)}
-      </Text>
-    </View>
-  );
-}
-
 function ShopProfile({ shop }: { shop: PublicShop }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const language = useSession((s) => s.language);
   const [tab, setTab] = useState<'shop' | 'reviews'>('shop');
+  const catalog = useFeatureFlag('catalog');
   const story =
     (language === 'ta' ? (shop.storyTa ?? shop.storyEn) : (shop.storyEn ?? shop.storyTa)) ?? '';
   const modes = [
@@ -199,7 +170,11 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
         ))}
       </View>
       {tab === 'shop' ? (
-        <EmptyState title={t('shop.public.noProducts')} body={t('shop.public.noProductsBody')} />
+        catalog ? (
+          <ShopProductGrid handle={shop.handle} />
+        ) : (
+          <EmptyState title={t('shop.public.noProducts')} body={t('shop.public.noProductsBody')} />
+        )
       ) : (
         <EmptyState title={t('shop.public.noReviews')} body={t('shop.public.noReviewsBody')} />
       )}

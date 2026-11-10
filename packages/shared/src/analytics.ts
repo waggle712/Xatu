@@ -34,6 +34,10 @@ export const analyticsEvents = {
   }),
   /** The order reached `completed` (picked up or delivered). */
   order_delivered: z.strictObject({ order_id: id, seller_id: id, fulfilment_mode: fulfilmentMode }),
+  /** A buyer opened a product page. */
+  product_viewed: z.strictObject({ product_id: id, shop_handle: z.string().max(30) }),
+  /** A seller started a new listing (the draft was created). */
+  product_draft_started: z.strictObject({ product_id: id, seller_id: id }),
   /** A seller picked or took a photo and the upload began. */
   media_upload_started: z.strictObject({
     purpose: mediaPurpose,
@@ -78,6 +82,11 @@ export const FEATURE_FLAGS = {
     key: 'seller-onboarding',
     default: false,
     description: 'Open your shop flow',
+  },
+  catalog: {
+    key: 'catalog',
+    default: false,
+    description: 'Seller product listing, product pages and shop product grids',
   },
 } as const;
 
