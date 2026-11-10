@@ -78,6 +78,7 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="shop" />
           <Stack.Screen name="s/[handle]" />
+          <Stack.Screen name="p/[id]" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />

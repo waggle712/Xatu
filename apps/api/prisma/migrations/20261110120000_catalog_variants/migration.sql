@@ -69,6 +69,10 @@ ADD CONSTRAINT "products_lead_time" CHECK (
   "lead_time_days" IS NULL OR ("made_to_order" = true AND "lead_time_days" BETWEEN 1 AND 60)
 );
 
+-- Products that were already live count as published when they were created.
+UPDATE "products" SET "published_at" = "created_at"
+WHERE "status" = 'active' AND "moderation_status" = 'live';
+
 -- Product photos point at media assets (no rows exist yet).
 DROP INDEX "product_media_product_id_position_idx";
 ALTER TABLE "product_media" DROP COLUMN "captured_in_app",

@@ -19,7 +19,7 @@ export class ApiRequestError extends Error {
 export class NetworkError extends Error {}
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Attach the access token and refresh it when needed. Default true. */
   auth?: boolean;
