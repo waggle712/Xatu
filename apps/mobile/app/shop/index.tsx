@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SectionRow } from '../../src/components/Rows';
+import { CoverPhotoEditor } from '../../src/features/media/CoverPhotoEditor';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { useMyShop, useShopAction } from '../../src/features/shop/api';
@@ -93,6 +94,8 @@ function ShopDashboard({ shop }: { shop: MyShop }) {
           {t(`shop.status.${shop.status}`, { app: APP_NAME })}
         </Text>
       </View>
+
+      {editable ? <CoverPhotoEditor shop={shop} /> : null}
 
       {missing.length > 0 ? (
         <View style={{ gap: theme.space[2] }}>

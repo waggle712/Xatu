@@ -41,10 +41,29 @@ describe('AUTH_DEV_BYPASS', () => {
     JWT_SECRET: 'x'.repeat(32),
   };
 
+  const r2 = {
+    MEDIA_STORAGE: 'r2',
+    R2_ACCOUNT_ID: 'acc',
+    R2_ACCESS_KEY_ID: 'key',
+    R2_SECRET_ACCESS_KEY: 'secret',
+    R2_BUCKET: 'bucket',
+    MEDIA_PUBLIC_BASE_URL: 'https://img.example.in',
+  };
+
   it('can never be enabled in production', () => {
-    expect(() => loadEnv({ ...base, NODE_ENV: 'production', AUTH_DEV_BYPASS: 'true' })).toThrow(
-      /never be enabled in production/,
+    expect(() =>
+      loadEnv({ ...base, ...r2, NODE_ENV: 'production', AUTH_DEV_BYPASS: 'true' }),
+    ).toThrow(/never be enabled in production/);
+  });
+
+  it('production cannot use local media storage, and R2 needs its settings', () => {
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production' })).toThrow(
+      /MEDIA_STORAGE=local is for development only/,
     );
+    expect(() => loadEnv({ ...base, MEDIA_STORAGE: 'r2' })).toThrow(
+      /MEDIA_STORAGE=r2 needs R2_ACCOUNT_ID/,
+    );
+    expect(loadEnv({ ...base, ...r2, NODE_ENV: 'production' }).MEDIA_STORAGE).toBe('r2');
   });
 
   it('defaults to off', () => {

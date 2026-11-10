@@ -56,6 +56,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     ['expo-maps', { requestLocationPermission: true }],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Your photos are used for your shop and product pictures.',
+        cameraPermission: 'The camera is used to photograph your products and shop.',
+        microphonePermission: false,
+      },
+    ],
     // Native crash reporting. Source maps upload only when SENTRY_AUTH_TOKEN is set (EAS secrets).
     [
       '@sentry/react-native/expo',

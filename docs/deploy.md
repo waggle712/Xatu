@@ -168,6 +168,17 @@ Notes:
    ECS rolls tasks over and only shifts traffic once `/health` passes.
 5. Check `/health`, the CloudWatch logs and Sentry (once added), then repeat for production.
 
+## Media (Cloudflare R2 + Image Transformations) and the worker
+
+Photos go straight from the phone to a **private R2 bucket** using a signed, 15-minute, single-object URL that pins the content type and exact size. The API never proxies uploads.
+
+1. In Cloudflare: create an R2 bucket `xatu-staging-media` (Asia-Pacific location hint), and an R2 API token scoped to that bucket with Object Read & Write. Store `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` in Secrets Manager.
+2. Connect a custom domain to the bucket (for example `img-staging.<your-domain>`) and turn on **Image Transformations** for that zone. Set `MEDIA_PUBLIC_BASE_URL=https://img-staging.<your-domain>`. Variants are URL transforms (`/cdn-cgi/image/width=320|800|1600,...`), so only the cleaned original is stored.
+3. Bucket CORS: allow `PUT` from the app (mobile apps send no Origin, so no browser CORS rule is needed unless an admin web upload is added).
+4. Set `MEDIA_STORAGE=r2` and `PUBLIC_API_URL=https://api-staging.<your-domain>` on both containers.
+
+**Worker container.** Media processing runs in BullMQ jobs. Run a second ECS service from the same image with command `node dist/src/worker.js` and `RUN_WORKERS=true`; set `RUN_WORKERS=false` on the API service. The worker needs the same secrets (database, Redis, R2) and no load balancer. Failed jobs are retried 5 times with exponential backoff, then moved to the `media-dead-letter` queue, the photo is marked `rejected` (`processing_failed`) and a Sentry alert is raised. Replay a dead-lettered job only after fixing the cause.
+
 ## Rollback
 
 - **Bad image:** run `update-express-gateway-service` again with the **previous tag** (images are immutable, so the old tag is exactly what ran before). Because migrations are expand-only, the old image works against the current database.
