@@ -8,6 +8,7 @@ import {
   type ProductDraft,
   type PublishProblem,
   type SellerProduct,
+  type VariantAttributes,
   type VariantInput,
 } from '@xatu/shared';
 import { Button, Chip, Text, useTheme } from '@xatu/ui';
@@ -19,6 +20,7 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { ToggleRow } from '../../components/Rows';
 import { TextField } from '../../components/TextField';
 import { XImage } from '../../components/XImage';
+import { apiRequest } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { uuidv4 } from '../../lib/uuid';
 import { useImageUpload } from '../media/useImageUpload';
@@ -44,9 +46,23 @@ interface Row {
   id?: string;
   label: string;
   labelTa: string;
+  attributes: VariantAttributes;
   price: string;
   stock: number;
 }
+
+/** What the options differ by. Each option's name is also stored as that attribute. */
+type OptionKind = 'size' | 'flavour' | 'weight';
+const OPTION_KINDS: OptionKind[] = ['size', 'flavour', 'weight'];
+
+const newRow = (price = ''): Row => ({
+  key: uuidv4(),
+  label: '',
+  labelTa: '',
+  attributes: {},
+  price,
+  stock: 1,
+});
 
 const toRows = (p: SellerProduct): Row[] =>
   p.variants.length > 0
@@ -55,10 +71,17 @@ const toRows = (p: SellerProduct): Row[] =>
         id: v.id,
         label: v.label ?? '',
         labelTa: v.labelTa ?? '',
+        attributes: v.attributes,
         price: paiseToRupeesInput(v.pricePaise),
         stock: v.stock,
       }))
-    : [{ key: uuidv4(), label: '', labelTa: '', price: '', stock: 1 }];
+    : [newRow()];
+
+const kindOf = (p: SellerProduct): OptionKind | null =>
+  OPTION_KINDS.find((k) => p.variants.some((v) => v.attributes[k] !== undefined)) ?? null;
+
+/** Server stock per variant id, from the last reply: the `stockBefore` of the next save. */
+const stockById = (p: SellerProduct) => new Map(p.variants.map((v) => [v.id, v.stock]));
 
 /**
  * Listing flow (Seller listing design): photos first, then details, then review and publish.
@@ -80,24 +103,57 @@ export function ProductEditor({
   );
   const apply = useApplyProduct();
   const [rows, setRows] = useState<Row[]>(() => toRows(product));
+  /** Bumped when the server refuses an edit, to reload the form from what the server has. */
+  const [formKey, setFormKey] = useState(0);
   /** Which local rows a sent variant list belongs to, so new variants learn their server ids. */
   const sentKeys = useRef(new WeakMap<VariantInput[], string[]>());
+  const serverStock = useRef(stockById(product));
 
   const onSaved = useCallback(
     (saved: SellerProduct, sent: ProductDraft) => {
       apply(saved);
+      serverStock.current = stockById(saved);
       const keys = sent.variants ? sentKeys.current.get(sent.variants) : undefined;
-      if (!keys || saved.variants.length !== keys.length) return;
+      if (!keys || !sent.variants || saved.variants.length !== keys.length) return;
+      const sentVariants = sent.variants;
       setRows((current) =>
         current.map((row) => {
           const i = keys.indexOf(row.key);
-          return i >= 0 && !row.id ? { ...row, id: saved.variants[i]!.id } : row;
+          if (i < 0) return row;
+          const server = saved.variants[i]!;
+          // Learn the id of a new option, and show the server's stock unless the seller has
+          // changed this number again since this save was sent.
+          return {
+            ...row,
+            id: row.id ?? server.id,
+            stock: row.stock === sentVariants[i]!.stock ? server.stock : row.stock,
+          };
         }),
       );
     },
     [apply],
   );
-  const autosave = useAutosave((patch) => saveDraft(product.id, patch), onSaved);
+  const autosave = useAutosave((patch) => saveDraft(product.id, patch), onSaved, {
+    // stockBefore is filled at send time from the last reply, so quick taps never collide.
+    prepare: (patch) =>
+      patch.variants
+        ? {
+            ...patch,
+            variants: patch.variants.map((v) =>
+              v.id ? { ...v, stockBefore: serverStock.current.get(v.id) ?? v.stock } : v,
+            ),
+          }
+        : patch,
+    onRejected: () => {
+      // Show what the server really has, so the form never sits on a refused value.
+      void apiRequest<SellerProduct>(`/seller/products/${product.id}`).then((fresh) => {
+        apply(fresh);
+        serverStock.current = stockById(fresh);
+        setRows(toRows(fresh));
+        setFormKey((k) => k + 1);
+      });
+    },
+  });
 
   const go = async (next: Step) => {
     await autosave.flush();
@@ -110,12 +166,19 @@ export function ProductEditor({
         title={t(isNew ? 'catalog.newTitle' : 'catalog.editTitle')}
         step={step}
         onStep={(s) => void go(s)}
-        saveText={autosave.status === 'idle' ? '' : t(`catalog.save.${autosave.status}`)}
-        saveError={autosave.status === 'error'}
+        saveText={
+          autosave.status === 'idle'
+            ? ''
+            : autosave.status === 'rejected'
+              ? errorMessage(autosave.error, t)
+              : t(`catalog.save.${autosave.status}`)
+        }
+        saveError={autosave.status === 'error' || autosave.status === 'rejected'}
       />
       {step === 1 ? <PhotosStep product={product} /> : null}
       {step === 2 ? (
         <DetailsStep
+          key={formKey}
           product={product}
           shop={shop}
           rows={rows}
@@ -404,6 +467,7 @@ function DetailsStep({
   const [madeToOrder, setMadeToOrder] = useState(product.madeToOrder);
   const [leadTime, setLeadTime] = useState(product.leadTimeDays ?? 2);
   const [modes, setModes] = useState<FulfilmentMode[]>(product.fulfilmentModes);
+  const [kind, setKind] = useState<OptionKind>(kindOf(product) ?? 'size');
   const offered: FulfilmentMode[] = [
     ...(shop.pickupAvailable ? (['pickup'] as const) : []),
     ...(shop.localDelivery ? (['local_delivery'] as const) : []),
@@ -414,18 +478,26 @@ function DetailsStep({
     schedule({ [field]: v.trim() || null });
 
   /** Sends the variant list only when every row is valid; otherwise the field shows why. */
-  const updateRows = (next: Row[]) => {
+  const updateRows = (next: Row[], optionKind: OptionKind = kind) => {
     setRows(next);
     const priced = next.map((r) => rupeesToPaise(r.price));
     const labelled = next.length === 1 || next.every((r) => r.label.trim().length > 0);
     if (priced.some((p) => p === null) || !labelled) return;
-    const variants: VariantInput[] = next.map((r, i) => ({
-      ...(r.id ? { id: r.id } : {}),
-      label: next.length === 1 ? null : r.label.trim(),
-      labelTa: next.length === 1 ? null : r.labelTa.trim() || null,
-      pricePaise: priced[i]!,
-      stock: r.stock,
-    }));
+    const variants: VariantInput[] = next.map((r, i) => {
+      // Keep other attributes; the option name is stored as the chosen kind (size/flavour/weight).
+      const others = Object.fromEntries(
+        Object.entries(r.attributes).filter(([k]) => !OPTION_KINDS.includes(k as OptionKind)),
+      );
+      const single = next.length === 1;
+      return {
+        ...(r.id ? { id: r.id } : {}),
+        label: single ? null : r.label.trim(),
+        labelTa: single ? null : r.labelTa.trim() || null,
+        attributes: single ? r.attributes : { ...others, [optionKind]: r.label.trim() },
+        pricePaise: priced[i]!,
+        stock: r.stock,
+      };
+    });
     schedule(
       { variants },
       next.map((r) => r.key),
@@ -469,6 +541,29 @@ function DetailsStep({
         ))}
       </View>
 
+      {multiple ? (
+        <View style={{ gap: theme.space[2] }}>
+          <Text variant="label" color="inkMuted">
+            {t('catalog.details.optionKind')}
+          </Text>
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] }}
+            accessibilityRole="radiogroup"
+          >
+            {OPTION_KINDS.map((k) => (
+              <Chip
+                key={k}
+                label={t(`catalog.details.kinds.${k}`)}
+                selected={kind === k}
+                onPress={() => {
+                  setKind(k);
+                  updateRows(rows, k);
+                }}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
       {rows.map((row, i) => (
         <View
           key={row.key}
@@ -491,13 +586,15 @@ function DetailsStep({
                 defaultValue={row.label}
                 onChangeText={(label) => patchRow(row.key, { label })}
                 maxLength={40}
-                error={row.label.trim() ? null : ' '}
+                autoCorrect={false}
+                error={row.label.trim() ? null : t('catalog.details.optionNameMissing')}
               />
               <TextField
                 label={t('catalog.details.optionNameTa')}
                 defaultValue={row.labelTa}
                 onChangeText={(labelTa) => patchRow(row.key, { labelTa })}
                 maxLength={40}
+                autoCorrect={false}
               />
             </>
           ) : null}
@@ -540,18 +637,7 @@ function DetailsStep({
           variant="secondary"
           label={t('catalog.details.addOption')}
           disabled={rows.length >= 20}
-          onPress={() =>
-            updateRows([
-              ...rows,
-              {
-                key: uuidv4(),
-                label: '',
-                labelTa: '',
-                price: rows[rows.length - 1]?.price ?? '',
-                stock: 1,
-              },
-            ])
-          }
+          onPress={() => updateRows([...rows, newRow(rows[rows.length - 1]?.price ?? '')])}
         />
         <Text variant="caption" color="inkMuted">
           {t('catalog.details.optionsHint')}

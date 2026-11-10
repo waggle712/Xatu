@@ -198,6 +198,7 @@ export class CatalogService {
     productId: string,
     variantId: string,
     stock: number,
+    stockBefore: number,
   ): Promise<SellerProduct> {
     const product = await this.loadOwned(userId, productId);
     // The variant must belong to THIS product; another product's variant id is "not found".
@@ -206,7 +207,7 @@ export class CatalogService {
       throw new AppError('variant_not_found', 'This option does not exist.', HttpStatus.NOT_FOUND);
     }
     await this.prisma.$transaction(async (tx) => {
-      await this.setStockLocked(tx, variant.id, stock, 'seller_set', userId);
+      await this.setStockLocked(tx, variant.id, stock, 'seller_set', userId, stockBefore);
     });
     return this.getOwn(userId, product.id);
   }
@@ -515,7 +516,17 @@ export class CatalogService {
       };
       if (input.id) {
         await tx.productVariant.update({ where: { id: input.id }, data: fields });
-        await this.setStockLocked(tx, input.id, input.stock, 'seller_set', userId);
+        // Only a stock the seller actually changed is written, and only from the value they saw.
+        if (input.stockBefore !== undefined && input.stock !== input.stockBefore) {
+          await this.setStockLocked(
+            tx,
+            input.id,
+            input.stock,
+            'seller_set',
+            userId,
+            input.stockBefore,
+          );
+        }
       } else {
         const created = await tx.productVariant.create({
           data: { ...fields, productId, stock: input.stock },
@@ -534,9 +545,10 @@ export class CatalogService {
   }
 
   /**
-   * The one place stock changes. Row lock on the variant, never below the units held by active
-   * reservations (those buyers are mid-checkout), and an append-only movement row in the same
-   * transaction.
+   * The one place stock changes. Row lock on the variant; compare-and-set against the stock the
+   * seller last saw (so an old screen never overwrites a sale or another device's change); never
+   * below the units held by active reservations (buyers mid-checkout); and an append-only
+   * movement row in the same transaction.
    */
   private async setStockLocked(
     tx: Tx,
@@ -544,12 +556,21 @@ export class CatalogService {
     stock: number,
     reason: StockMovementReason,
     actorId: string,
+    expected: number,
   ): Promise<void> {
     const rows = await tx.$queryRaw<{ stock: number }[]>`
       SELECT stock FROM product_variants WHERE id = ${variantId}::uuid FOR UPDATE`;
     const before = rows[0]?.stock;
     if (before === undefined) {
       throw new AppError('variant_not_found', 'This option does not exist.', HttpStatus.NOT_FOUND);
+    }
+    if (before !== expected) {
+      throw new AppError(
+        'stock_changed',
+        'Stock changed since you opened this. Check the new number and try again.',
+        HttpStatus.CONFLICT,
+        { stock: before },
+      );
     }
     if (stock === before) return;
     const reserved = await this.reservedUnits(tx, variantId);

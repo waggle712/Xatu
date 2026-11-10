@@ -18,6 +18,8 @@ export interface RateLimitOptions {
   /** Max requests per window, per client IP. */
   limit: number;
   windowSeconds: number;
+  /** Also count separately per value of this route param (e.g. 'id' = per product). */
+  perParam?: string;
 }
 
 const RATE_LIMIT = 'xatu:rate-limit';
@@ -44,7 +46,8 @@ export class RateLimitGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
     const window = Math.floor(Date.now() / 1000 / options.windowSeconds);
-    const key = `${RATE_LIMIT_KEY_PREFIX}${options.name}:${req.ip ?? 'unknown'}:${window}`;
+    const scope = options.perParam ? `${String(req.params?.[options.perParam] ?? '')}:` : '';
+    const key = `${RATE_LIMIT_KEY_PREFIX}${options.name}:${req.ip ?? 'unknown'}:${scope}${window}`;
 
     const [[, count]] = (await this.redis
       .multi()

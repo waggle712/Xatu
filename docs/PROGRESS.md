@@ -68,6 +68,7 @@ The rules were added after prompts 1–5. These parts of the existing code don't
 - **Products go live without review** when the shop is active (decided 10 Nov 2026). Admins can hold or remove a product in prompt 20; a hold is never undone by the seller. One function (`moderationOnPublish`) changes this.
 - **Left out of the product page on purpose:** Buy button (prompt 14), delivery fees, reviews and trust score (prompt 19), share and save (prompt 13), and any "money held" / Protected Pay copy. The listing flow has no "Speak in Tamil" or photo-drafted text yet, and no pickup slots step.
 - **Profiles still counts live products and completed orders itself** for the shop header (it reads `products` and `orders` directly, and counts the old `delivered` status). Move these behind catalog and orders services when orders are built (prompt 14).
+- **Stock edits are compare-and-set:** every change says which stock it started from (`stockBefore`); if stock changed elsewhere the save is refused with `stock_changed` and the app reloads the real number. Prompt 14's checkout must change stock through the same locked path.
 - **Product ids come from the phone** (random UUID v4) so a retried create is safe. Lists are ordered by `published_at`, not by id.
 - **Shop approval** is an admin action (prompt 20). Until then shops move from `kyc_pending` to `active` by hand.
 - **Exact pickup address for buyers** is revealed only after an order is accepted (prompt 17). Today no buyer can see it.

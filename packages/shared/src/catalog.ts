@@ -71,15 +71,26 @@ export const variantAttributesSchema = z.strictObject({
 });
 export type VariantAttributes = z.infer<typeof variantAttributesSchema>;
 
-export const variantInputSchema = z.strictObject({
-  /** Present for an existing variant; omitted for a new one. */
-  id: z.string().uuid().optional(),
-  label: optionalText(40),
-  labelTa: optionalText(40),
-  attributes: variantAttributesSchema.optional(),
-  pricePaise,
-  stock,
-});
+export const variantInputSchema = z
+  .strictObject({
+    /** Present for an existing variant; omitted for a new one. */
+    id: z.string().uuid().optional(),
+    label: optionalText(40),
+    labelTa: optionalText(40),
+    attributes: variantAttributesSchema.optional(),
+    pricePaise,
+    stock,
+    /**
+     * The stock the app last saw from the server (existing variants). Stock is only changed when
+     * `stock` differs from it, and only if the server still has `stockBefore`; otherwise 409
+     * stock_changed. So an old form can never put sold units back on sale.
+     */
+    stockBefore: stock.optional(),
+  })
+  .refine((v) => !v.id || v.stockBefore !== undefined, {
+    message: 'stockBefore is required for an existing option',
+    path: ['stockBefore'],
+  });
 export type VariantInput = z.infer<typeof variantInputSchema>;
 
 /** Autosaved draft fields. Every field is optional; a draft may be incomplete. */
@@ -129,7 +140,8 @@ export const setProductPhotosSchema = z.strictObject({
 });
 export type SetProductPhotosRequest = z.infer<typeof setProductPhotosSchema>;
 
-export const setStockSchema = z.strictObject({ stock });
+/** Compare-and-set: applied only if the server still has `stockBefore`. */
+export const setStockSchema = z.strictObject({ stock, stockBefore: stock });
 export type SetStockRequest = z.infer<typeof setStockSchema>;
 
 // ───────────────────────────── Publish checks ─────────────────────────────

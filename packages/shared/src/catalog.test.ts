@@ -96,6 +96,21 @@ describe('draft input', () => {
     expect(productDraftSchema.safeParse({ variants: [v, v] }).success).toBe(false);
   });
 
+  it('an existing option must say which stock it started from', () => {
+    const id = uuid(5);
+    expect(
+      productDraftSchema.safeParse({ variants: [{ id, pricePaise: 100, stock: 2 }] }).success,
+    ).toBe(false);
+    expect(
+      productDraftSchema.safeParse({
+        variants: [{ id, pricePaise: 100, stock: 2, stockBefore: 1 }],
+      }).success,
+    ).toBe(true);
+    expect(
+      productDraftSchema.safeParse({ variants: [{ pricePaise: 100, stock: 2 }] }).success,
+    ).toBe(true);
+  });
+
   it('create needs a client id', () => {
     expect(createProductSchema.safeParse({}).success).toBe(false);
     expect(createProductSchema.safeParse({ id: uuid(1) }).success).toBe(true);

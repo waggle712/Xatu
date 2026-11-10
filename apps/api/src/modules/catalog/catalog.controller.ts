@@ -97,7 +97,7 @@ export class CatalogController {
 
   @Patch('seller/products/:id')
   @UseGuards(AuthGuard, RateLimitGuard)
-  @RateLimit({ name: 'catalog:autosave', limit: 600, windowSeconds: 3600 })
+  @RateLimit({ name: 'catalog:autosave', limit: 600, windowSeconds: 3600, perParam: 'id' })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Autosave draft fields and the full variant list' })
   @ApiBody({ schema: jsonSchema(productDraftSchema) })
@@ -133,7 +133,7 @@ export class CatalogController {
     @Param('variantId', ParseUUIDPipe) variantId: string,
     @Body(new ZodValidationPipe(setStockSchema)) body: SetStockRequest,
   ): Promise<SellerProduct> {
-    return this.catalog.setStock(user.id, id, variantId, body.stock);
+    return this.catalog.setStock(user.id, id, variantId, body.stock, body.stockBefore);
   }
 
   @Post('seller/products/:id/publish')

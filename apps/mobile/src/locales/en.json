@@ -58,7 +58,8 @@
       "variant_reserved": "Someone is buying this option right now. Try again in a few minutes.",
       "variant_not_found": "That option was changed. Refresh and try again.",
       "fulfilment_not_offered": "Turn this delivery option on for your shop first.",
-      "lead_time_invalid": "Days to make are only for made-to-order products."
+      "lead_time_invalid": "Days to make are only for made-to-order products.",
+      "stock_changed": "Stock changed since you opened this. Check the new number and try again."
     }
   },
   "tabs": {
@@ -299,7 +300,14 @@
         "pickup": "Pickup from me",
         "local_delivery": "Local delivery",
         "courier": "Courier"
-      }
+      },
+      "optionKind": "Options differ by",
+      "kinds": {
+        "size": "Size",
+        "flavour": "Flavour",
+        "weight": "Weight"
+      },
+      "optionNameMissing": "Name this option"
     },
     "review": {
       "title": "Check and publish",

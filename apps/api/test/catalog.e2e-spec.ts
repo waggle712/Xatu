@@ -176,7 +176,7 @@ describe('Catalog (e2e)', () => {
         .set(auth(s.token))
         .send({
           variants: [
-            { id: twelve!.id, label: 'Box of 12', pricePaise: 26000, stock: 7 },
+            { id: twelve!.id, label: 'Box of 12', pricePaise: 26000, stock: 7, stockBefore: 4 },
             { label: 'Box of 24', pricePaise: 48000, stock: 2 },
           ],
         })
@@ -506,6 +506,7 @@ describe('Catalog (e2e)', () => {
         as(http().put(`/seller/products/${live.id}/photos`)).send({ mediaIds: [] }),
         as(http().post(`/seller/products/${live.id}/variants/${variantId}/stock`)).send({
           stock: 0,
+          stockBefore: 12,
         }),
         as(http().post(`/seller/products/${live.id}/publish`)),
         as(http().post(`/seller/products/${live.id}/pause`)),
@@ -540,17 +541,19 @@ describe('Catalog (e2e)', () => {
       await http()
         .post(`/seller/products/${mine.id}/variants/${myOther.variants[0]!.id}/stock`)
         .set(auth(a.token))
-        .send({ stock: 0 })
+        .send({ stock: 0, stockBefore: 12 })
         .expect(404);
       await http()
         .post(`/seller/products/${mine.id}/variants/${theirs.variants[0]!.id}/stock`)
         .set(auth(a.token))
-        .send({ stock: 0 })
+        .send({ stock: 0, stockBefore: 12 })
         .expect(404);
       await http()
         .patch(`/seller/products/${mine.id}`)
         .set(auth(a.token))
-        .send({ variants: [{ id: theirs.variants[0]!.id, pricePaise: 1, stock: 0 }] })
+        .send({
+          variants: [{ id: theirs.variants[0]!.id, pricePaise: 1, stock: 0, stockBefore: 12 }],
+        })
         .expect(422);
 
       const untouched = await prisma.productVariant.findUniqueOrThrow({
@@ -578,7 +581,7 @@ describe('Catalog (e2e)', () => {
       });
     }
 
-    it('20 parallel stock changes leave a consistent, append-only history', async () => {
+    it('20 parallel changes from the same starting stock: exactly one wins, history stays consistent', async () => {
       const s = await seller();
       const live = await liveProduct(s.token);
       const variantId = live.variants[0]!.id;
@@ -588,17 +591,20 @@ describe('Catalog (e2e)', () => {
           http()
             .post(`/seller/products/${live.id}/variants/${variantId}/stock`)
             .set(auth(s.token))
-            .send({ stock }),
+            .send({ stock, stockBefore: 12 }),
         ),
       );
-      expect(results.every((r) => r.status === 200)).toBe(true);
+      expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+      const conflicts = results.filter((r) => r.status === 409);
+      expect(conflicts).toHaveLength(19);
+      expect(conflicts.every((r) => r.body.error.code === 'stock_changed')).toBe(true);
 
       const variant = await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } });
       const moves = await prisma.stockMovement.findMany({
         where: { variantId },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
-      expect(moves).toHaveLength(21); // listing_created + 20 changes
+      expect(moves).toHaveLength(2); // listing_created + the one winner
       let running = 0;
       for (const m of moves) {
         running += m.delta;
@@ -606,6 +612,46 @@ describe('Catalog (e2e)', () => {
       }
       expect(running).toBe(variant.stock);
       expect(targets).toContain(variant.stock);
+    });
+
+    it('an old form can never overwrite stock that changed elsewhere', async () => {
+      const s = await seller();
+      const live = await liveProduct(s.token);
+      const variantId = live.variants[0]!.id;
+      // Stock changes elsewhere (another phone; from prompt 14, a sale): 12 → 5.
+      await http()
+        .post(`/seller/products/${live.id}/variants/${variantId}/stock`)
+        .set(auth(s.token))
+        .send({ stock: 5, stockBefore: 12 })
+        .expect(200);
+      const movesBefore = await prisma.stockMovement.count({ where: { variantId } });
+
+      // The old form still thinks there are 12 and tries to set 13 with a new price.
+      await http()
+        .patch(`/seller/products/${live.id}`)
+        .set(auth(s.token))
+        .send({ variants: [{ id: variantId, pricePaise: 50000, stock: 13, stockBefore: 12 }] })
+        .expect(409)
+        .expect(({ body }) => expect(body.error.code).toBe('stock_changed'));
+      let row = await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } });
+      expect([row.stock, row.pricePaise]).toEqual([5, 45000n]); // whole save rolled back
+
+      // A price-only save from the same old form leaves stock alone.
+      await http()
+        .patch(`/seller/products/${live.id}`)
+        .set(auth(s.token))
+        .send({ variants: [{ id: variantId, pricePaise: 50000, stock: 12, stockBefore: 12 }] })
+        .expect(200);
+      row = await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } });
+      expect([row.stock, row.pricePaise]).toEqual([5, 50000n]);
+      expect(await prisma.stockMovement.count({ where: { variantId } })).toBe(movesBefore);
+
+      // An existing option must say what stock it started from.
+      await http()
+        .patch(`/seller/products/${live.id}`)
+        .set(auth(s.token))
+        .send({ variants: [{ id: variantId, pricePaise: 50000, stock: 6 }] })
+        .expect(400);
     });
 
     it("can't go below what buyers are holding in checkout; expired holds don't count", async () => {
@@ -618,13 +664,13 @@ describe('Catalog (e2e)', () => {
       await http()
         .post(`/seller/products/${live.id}/variants/${variantId}/stock`)
         .set(auth(s.token))
-        .send({ stock: 2 })
+        .send({ stock: 2, stockBefore: 12 })
         .expect(409)
         .expect(({ body }) => expect(body.error.details.reserved).toBe(3));
       await http()
         .post(`/seller/products/${live.id}/variants/${variantId}/stock`)
         .set(auth(s.token))
-        .send({ stock: 3 })
+        .send({ stock: 3, stockBefore: 12 })
         .expect(200);
 
       // A held option can't be removed either.
