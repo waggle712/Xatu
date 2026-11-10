@@ -273,6 +273,9 @@ model SellerProfile {
   pincode            String?
   /// Exact pickup point (PostGIS, WGS 84). PRIVATE: public views only get a rounded location.
   location           Unsupported("geography(Point, 4326)")?
+  /// PUBLIC: the exact point rounded to 2 decimals (about 1 km), written with `location`. Discovery
+  /// (feed radius, distance, map pins) uses only this, so results can't reveal the exact spot.
+  approxLocation     Unsupported("geography(Point, 4326)")? @map("approx_location")
   /// PRIVATE: shown to the owner, and to a buyer only after their order is accepted.
   pickupAddressLine  String?                                @map("pickup_address_line")
   pickupLandmark     String?                                @map("pickup_landmark")
@@ -299,6 +302,7 @@ model SellerProfile {
   @@index([city, status])
   @@index([pincode])
   @@index([location], type: Gist, map: "seller_profiles_location_gist_idx")
+  @@index([approxLocation], type: Gist, map: "seller_profiles_approx_location_gist_idx")
   @@index([businessName(ops: raw("gin_trgm_ops"))], type: Gin, map: "seller_profiles_business_name_trgm_idx")
   @@map("seller_profiles")
 }
@@ -358,6 +362,8 @@ model Product {
   @@index([sellerId, status])
   @@index([categoryId, status, moderationStatus])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_trgm_idx")
+  @@index([titleTa(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_title_ta_trgm_idx")
+  @@index([status, moderationStatus, publishedAt])
   @@map("products")
 }
 
@@ -806,4 +812,15 @@ model OutboxEvent {
 
   @@index([publishedAt, createdAt])
   @@map("outbox_events")
+}
+
+/// Search: Latin spellings of common Tamil words (and back), so "murukku" finds "முறுக்கு".
+model SearchTransliteration {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  latin     String
+  tamil     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([latin, tamil])
+  @@map("search_transliterations")
 }

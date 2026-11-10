@@ -38,6 +38,18 @@ export const analyticsEvents = {
   product_viewed: z.strictObject({ product_id: id, shop_handle: z.string().max(30) }),
   /** A seller started a new listing (the draft was created). */
   product_draft_started: z.strictObject({ product_id: id, seller_id: id }),
+  /** A buyer searched. The words themselves are never sent (they can contain names). */
+  search_performed: z.strictObject({
+    query_length: z.number().int().min(1).max(60),
+    results: z.number().int().nonnegative(),
+    transliterated: z.boolean(),
+  }),
+  /** A buyer opened a product from the feed or search. */
+  feed_item_opened: z.strictObject({
+    product_id: id,
+    position: z.number().int().nonnegative(),
+    source: z.enum(['feed', 'search']),
+  }),
   /** A seller picked or took a photo and the upload began. */
   media_upload_started: z.strictObject({
     purpose: mediaPurpose,
@@ -82,6 +94,11 @@ export const FEATURE_FLAGS = {
     key: 'seller-onboarding',
     default: false,
     description: 'Open your shop flow',
+  },
+  discovery: {
+    key: 'discovery',
+    default: false,
+    description: 'Home feed, search and map',
   },
   catalog: {
     key: 'catalog',

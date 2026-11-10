@@ -6,6 +6,7 @@ describe('analytics events', () => {
     expect(Object.keys(analyticsEvents).sort()).toEqual(
       [
         'buyer_signed_up',
+        'feed_item_opened',
         'media_upload_failed',
         'media_upload_started',
         'media_upload_succeeded',
@@ -14,6 +15,7 @@ describe('analytics events', () => {
         'product_draft_started',
         'product_listed',
         'product_viewed',
+        'search_performed',
         'seller_signed_up',
       ].sort(),
     );

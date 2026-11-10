@@ -6,3 +6,4 @@ export * from './analytics.ts';
 export * from './seller.ts';
 export * from './media.ts';
 export * from './catalog.ts';
+export * from './discovery.ts';
