@@ -48,18 +48,48 @@ packages/
 infra/       docker-compose for local Postgres + Redis
 ```
 
-## Rules that matter
+## Permanent rules (apply to every task)
 
-- Money is integer paise, never floats. Prices are always read from the DB, never trusted from the app.
-- An order becomes `paid` ONLY from a verified Razorpay webhook (check signature, handle idempotently).
-- Every money endpoint takes an `Idempotency-Key` header. State changes write an `outbox_events` row in the same transaction.
-- Order states: pending_payment → paid → accepted → ready_for_pickup | shipped → delivered; exits: cancelled, refunded. Every change writes `order_events`.
-- Reviews only for a delivered `order_item` by that buyer.
-- Delivery/pickup OTP codes stored hashed, single use, limited attempts.
+This is a startup product with real money and real users, not a demo. Production quality only.
+
+### Money and payments
+
+- Money is integer paise stored as `bigint`. Never floats. Prices, fees and tax are computed on the server; never trust amounts from the app.
+- Order status and payment status are SEPARATE state machines:
+  - **Order:** `draft → awaiting_payment → placed → accepted → preparing → ready_for_pickup | out_for_delivery → completed`; exits: `expired`, `cancelled_by_buyer`, `cancelled_by_seller`, `in_dispute`, `refunded`, `partially_refunded`.
+  - **Payment:** `initiated → pending → verified → settlement_eligible → settled`; exits: `failed`, `expired`, `refund_pending`, `refunded`, `disputed`, `reversed`.
+- A payment becomes `verified` ONLY from a signature-checked Razorpay webhook or a server-side fetch from Razorpay, never from the app's success callback.
+- Every money movement is an append-only, balanced double-entry ledger transaction. No UPDATE or DELETE on ledger rows; fix mistakes with reversing entries.
+- Every mutating order or money endpoint requires an `Idempotency-Key` header, stored in `idempotency_records`.
+- Webhooks are stored raw first (unique on provider event id), then processed by a BullMQ job. Duplicate or out-of-order delivery must be harmless.
+
+### Orders and stock
+
+- Stock is held with `inventory_reservations` (15-minute TTL) under row locks. Two buyers can never buy the last unit.
+- Orders store snapshots (title, variant, price, maker, address). Every state change writes an event row plus an `outbox_events` row in the same transaction.
+- Reviews only for a completed `order_item`, by that order's buyer.
+- Delivery/pickup OTP codes are stored hashed, single use, with limited attempts.
+- A notification failure never changes order or payment state.
+
+### Security and privacy
+
+- Ownership is checked in services: a seller can never touch another seller's data. Write a test for each resource.
+- Every admin action is written to `admin_audit_logs` (before, after, reason). Admin login requires TOTP MFA.
 - Modules talk to each other only through their public service, never another module's tables.
 - Personal data (users, orders) stays in the Mumbai database. Support account deletion (DPDP Act).
-- Brand colours come from `packages/ui/tokens.ts`; never paste hex values into screens. Text on marigold buttons is Plum Ink `#3A2230`, never white.
-- Touch targets ≥ 48px, body text ≥ 12px, every icon-only button has an accessibility label.
+- Secrets only in `.env` files (git-ignored) or AWS Secrets Manager. The repo is public: never commit secrets or internal business documents.
+
+### Screens
+
+- Every screen: Tamil + English, light + dark, loading / empty / error / offline states, 48dp touch targets, accessibility labels, works at 200% font size.
+- Brand colours come from `packages/ui` tokens; never paste hex values into screens. Text on marigold buttons is Plum Ink, never white. Body text ≥ 12px.
+
+### Shipping features
+
+- New features ship behind a PostHog feature flag with typed analytics events.
+- Tests first for money, orders, inventory and auth. Integration tests use real Postgres (Testcontainers), not mocks.
+- Before saying done: lint, typecheck, unit and integration tests are green. Then open a PR with a test summary and a rollback note.
+- After every prompt or feature, update `docs/PROGRESS.md`.
 
 ## Brand tokens (light theme)
 
@@ -68,11 +98,10 @@ brand text (deep rose) #9A4E5E · brand-fill (Dusty Rose) #C98A96 · on-brand #3
 marigold (action) #E3A62F · on-marigold #3A2230 · sage (trust only) #4E6B4C · sage-soft #E2EADB · gold (Antique Gold) #C29A62 · gold-text #7A5826 · critical #B3261E
 Banned pairs (fail contrast): Ivory text on Dusty Rose, deep rose text on Blush, white text on Marigold.
 Fonts: Fraunces (display, prices; Tamil falls back to Noto Serif Tamil), Hind Madurai (body). Radius 8 / 14 / 22 / pill. Spacing 4-based.
-Full token list with dark theme: the brand kit at https://claude.ai/artifact/4qirKb8CKu6aNu8vkMQeGH (also `brand-kit/tokens.json` in the zip).
+Full token list with dark theme: the brand kit at https://claude.ai/artifact/4qirKb8CKu6aNu8vkMQeGH (also `docs/brand-kit/tokens.json`).
 
 ## Working style
 
-- Small PRs, one feature per branch. Run lint, typecheck and tests before saying a task is done.
-- Write tests for money, order state and auth code first.
+- Small PRs, one feature per branch.
 - When unsure about a product decision, ask instead of guessing.
-- Commands: `pnpm dev` (all), `pnpm --filter api dev`, `pnpm --filter mobile start`, `pnpm test`, `pnpm lint`, `pnpm typecheck`.
+- Commands: `pnpm dev` (all), `pnpm --filter api dev`, `pnpm --filter mobile start`, `pnpm test`, `pnpm test:e2e`, `pnpm lint`, `pnpm typecheck`.
