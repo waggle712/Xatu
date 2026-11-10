@@ -7,6 +7,7 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Polygon } from 'react-native-svg';
 import { BackButton } from '../../src/components/BackButton';
+import { XImage } from '../../src/components/XImage';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { usePublicShop } from '../../src/features/shop/api';
 import { errorMessage } from '../../src/lib/errors';
@@ -97,6 +98,9 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
 
   return (
     <View style={{ gap: theme.space[4] }}>
+      {shop.cover ? (
+        <XImage image={shop.cover} aspectRatio={16 / 9} accessibilityLabel={shop.businessName} />
+      ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[4] }}>
         <HexAvatar name={shop.businessName} />
         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around' }}>

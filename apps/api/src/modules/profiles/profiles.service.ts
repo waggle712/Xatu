@@ -15,6 +15,7 @@ import {
 } from '@xatu/shared';
 import { AnalyticsService } from '../../analytics/analytics.service.js';
 import { AppError } from '../../common/errors.js';
+import { MediaService } from '../media/media.service.js';
 import { Prisma, type SellerProfile } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
@@ -29,6 +30,7 @@ export class ProfilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
+    private readonly media: MediaService,
   ) {}
 
   async listCategories(): Promise<Category[]> {
@@ -125,6 +127,7 @@ export class ProfilesService {
           HttpStatus.UNPROCESSABLE_ENTITY,
         );
     }
+    if (patch.coverMediaId) await this.media.requireReady(userId, patch.coverMediaId, 'shop_cover');
     const { location, openingHours, ...fields } = patch;
     await this.prisma.$transaction(async (tx) => {
       await tx.sellerProfile.update({
@@ -176,7 +179,10 @@ export class ProfilesService {
   async getPublicShop(handle: string): Promise<PublicShop> {
     const shop = await this.prisma.sellerProfile.findUnique({
       where: { handle },
-      include: { category: { select: { slug: true, nameEn: true, nameTa: true } } },
+      include: {
+        category: { select: { slug: true, nameEn: true, nameTa: true } },
+        coverMedia: true,
+      },
     });
     if (!shop || !PUBLIC_SELLER_STATUSES.includes(shop.status)) {
       throw new AppError('shop_not_found', 'This shop is not available.', HttpStatus.NOT_FOUND);
@@ -200,7 +206,7 @@ export class ProfilesService {
       openingHours: parseHours(shop.openingHours),
       pickupAvailable: shop.pickupAvailable,
       localDelivery: shop.localDelivery,
-      coverMediaKey: shop.coverMediaKey,
+      cover: this.media.toImage(shop.coverMedia),
       status: shop.status as 'active' | 'paused',
       verified: shop.verificationStatus === 'verified',
       liveProductCount,
@@ -266,7 +272,11 @@ export class ProfilesService {
       openingHours,
       pickupAvailable: shop.pickupAvailable,
       localDelivery: shop.localDelivery,
-      coverMediaKey: shop.coverMediaKey,
+      cover: shop.coverMediaId
+        ? this.media.toImage(
+            await this.prisma.mediaAsset.findUnique({ where: { id: shop.coverMediaId } }),
+          )
+        : null,
       status: shop.status,
       verified: shop.verificationStatus === 'verified',
       missingForSubmit:

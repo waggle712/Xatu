@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { analyticsEvents, FEATURE_FLAGS, parseAnalyticsEvent } from './analytics.ts';
 
 describe('analytics events', () => {
-  it('defines exactly the five pilot events', () => {
+  it('defines exactly the pilot and media events', () => {
     expect(Object.keys(analyticsEvents).sort()).toEqual(
       [
         'buyer_signed_up',
+        'media_upload_failed',
+        'media_upload_started',
+        'media_upload_succeeded',
         'order_delivered',
         'order_paid',
         'product_listed',
@@ -47,6 +50,22 @@ describe('analytics events', () => {
     for (const schema of Object.values(analyticsEvents)) {
       for (const key of Object.keys(schema.shape)) expect(key).not.toMatch(banned);
     }
+  });
+
+  it('media failure events carry a known reason only', () => {
+    expect(
+      parseAnalyticsEvent('media_upload_failed', {
+        purpose: 'shop_cover',
+        reason: 'rejected',
+        reject_reason: 'too_small',
+      }),
+    ).toMatchObject({ reason: 'rejected' });
+    expect(() =>
+      parseAnalyticsEvent('media_upload_failed', {
+        purpose: 'shop_cover',
+        reason: 'oops',
+      } as never),
+    ).toThrow();
   });
 
   it('feature flags default to off', () => {

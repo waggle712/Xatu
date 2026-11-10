@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { imageSchema } from './media.ts';
 
 export const sellerStatusSchema = z.enum(['draft', 'kyc_pending', 'active', 'paused', 'suspended']);
 export type SellerStatus = z.infer<typeof sellerStatusSchema>;
@@ -93,6 +94,8 @@ export const updateShopSchema = z
     openingHours: openingHoursSchema,
     pickupAvailable: z.boolean(),
     localDelivery: z.boolean(),
+    /** A ready `shop_cover` upload owned by this user, or null to remove the cover. */
+    coverMediaId: z.string().uuid().nullable(),
   })
   .partial();
 export type UpdateShopRequest = z.infer<typeof updateShopSchema>;
@@ -149,7 +152,7 @@ export const myShopSchema = z.object({
   openingHours: openingHoursSchema,
   pickupAvailable: z.boolean(),
   localDelivery: z.boolean(),
-  coverMediaKey: z.string().nullable(),
+  cover: imageSchema.nullable(),
   status: sellerStatusSchema,
   verified: z.boolean(),
   missingForSubmit: z.array(z.string()),
@@ -169,7 +172,7 @@ export const publicShopSchema = z.object({
   openingHours: openingHoursSchema,
   pickupAvailable: z.boolean(),
   localDelivery: z.boolean(),
-  coverMediaKey: z.string().nullable(),
+  cover: imageSchema.nullable(),
   status: z.enum(['active', 'paused']),
   verified: z.boolean(),
   liveProductCount: z.number().int(),

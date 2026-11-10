@@ -196,5 +196,33 @@
       "noReviewsBody": "Reviews come only from buyers who completed an order.",
       "approx": "approx. area"
     }
+  },
+  "media": {
+    "cover": "Cover photo",
+    "coverHint": "A wide photo of your work or workspace. Buyers see it at the top of your shop.",
+    "add": "Add cover photo",
+    "change": "Change cover photo",
+    "library": "Choose from photos",
+    "camera": "Take a photo",
+    "preparing": "Getting the photo ready…",
+    "uploading": "Uploading {{percent}}%",
+    "processing": "Checking the photo…",
+    "retry": "Try again",
+    "failed": {
+      "permission": "Allow photo access in Settings to add a photo.",
+      "network": "Upload stopped. Check your internet and try again.",
+      "rejected": "This photo can't be used. Try a different one.",
+      "timeout": "This is taking too long. Try again.",
+      "unknown": "Something went wrong. Try again."
+    },
+    "rejectReasons": {
+      "too_small": "The photo is too small. Use one at least 200 pixels wide.",
+      "not_an_image": "That file isn't a photo.",
+      "type_mismatch": "That file isn't a photo.",
+      "too_large": "The photo is too large.",
+      "too_many_pixels": "The photo is too large.",
+      "unreadable": "The photo couldn't be read.",
+      "processing_failed": "We couldn't process the photo. Try again."
+    }
   }
 }

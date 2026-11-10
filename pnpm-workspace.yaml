@@ -23,6 +23,7 @@ minimumReleaseAgeExclude:
   - '@posthog/core@1.66.0'
   - '@posthog/types@1.423.0'
   - posthog-node@5.65.0
+  - bullmq@6.7.3
 
 nodeLinker: hoisted
 
@@ -38,3 +39,4 @@ allowBuilds:
   cpu-features: false
   ssh2: false
   '@sentry/cli': true
+  msgpackr-extract: false

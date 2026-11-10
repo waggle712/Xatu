@@ -46,6 +46,19 @@ enum SellerStatus {
   suspended
 }
 
+enum MediaPurpose {
+  shop_cover
+  product_photo
+}
+
+/// pending (ticket issued) → processing (worker) → ready | rejected
+enum MediaStatus {
+  pending
+  processing
+  ready
+  rejected
+}
+
 enum VerificationStatus {
   unverified
   pending
@@ -178,6 +191,7 @@ model User {
   reviews         Review[]
   reports         Report[]               @relation("Reporter")
   idempotencyKeys IdempotencyKey[]
+  mediaAssets     MediaAsset[]
 
   @@map("users")
 }
@@ -255,7 +269,7 @@ model SellerProfile {
   pickupLandmark     String?                                @map("pickup_landmark")
   /// Weekly hours in IST, validated by openingHoursSchema in @xatu/shared.
   openingHours       Json                                   @default("{}") @map("opening_hours")
-  coverMediaKey      String?                                @map("cover_media_key")
+  coverMediaId       String?                                @map("cover_media_id") @db.Uuid
   pickupAvailable    Boolean                                @default(true) @map("pickup_available")
   localDelivery      Boolean                                @default(false) @map("local_delivery")
   courierAvailable   Boolean                                @default(false) @map("courier_available")
@@ -266,11 +280,12 @@ model SellerProfile {
   createdAt          DateTime                               @default(now()) @map("created_at")
   updatedAt          DateTime                               @updatedAt @map("updated_at")
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  category Category? @relation(fields: [categoryId], references: [id])
-  products Product[]
-  orders   Order[]   @relation("SellerOrders")
-  reviews  Review[]
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  coverMedia MediaAsset? @relation("ShopCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  products   Product[]
+  orders     Order[]     @relation("SellerOrders")
+  reviews    Review[]
 
   @@index([city, status])
   @@index([pincode])
@@ -347,6 +362,40 @@ model ProductMedia {
 
   @@index([productId, position])
   @@map("product_media")
+}
+
+// ───────────────────────────── Media ─────────────────────────────
+
+/// An uploaded image. Only the storage key is stored; URLs are built when read, so the CDN can change.
+model MediaAsset {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  ownerId       String       @map("owner_id") @db.Uuid
+  purpose       MediaPurpose
+  status        MediaStatus  @default(pending)
+  /// Where the phone uploads the original. Deleted after processing.
+  uploadKey     String       @unique @map("upload_key")
+  /// The cleaned image (EXIF stripped) that variants are made from. Set when ready.
+  storageKey    String?      @unique @map("storage_key")
+  declaredType  String       @map("declared_type")
+  declaredBytes Int          @map("declared_bytes")
+  contentType   String?      @map("content_type")
+  byteSize      Int?         @map("byte_size")
+  width         Int?
+  height        Int?
+  blurhash      String?
+  capturedInApp Boolean      @default(false) @map("captured_in_app")
+  rejectReason  String?      @map("reject_reason")
+  attempts      Int          @default(0)
+  readyAt       DateTime?    @map("ready_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  owner      User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  shopCovers SellerProfile[] @relation("ShopCover")
+
+  @@index([ownerId, createdAt])
+  @@index([status, createdAt])
+  @@map("media_assets")
 }
 
 // ───────────────────────────── Orders ─────────────────────────────

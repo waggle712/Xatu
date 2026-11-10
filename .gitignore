@@ -23,3 +23,6 @@ GoogleService-Info.plist
 
 # Generated Prisma client
 apps/api/src/generated/
+
+# Local media (development)
+apps/api/.media/

@@ -26,6 +26,24 @@ const envSchema = z.object({
   /** PostHog project API key. Leave empty to disable analytics. */
   POSTHOG_API_KEY: z.string().default(''),
   POSTHOG_HOST: z.string().url().default('https://eu.i.posthog.com'),
+  /** Public base URL of this API (used for local media URLs). */
+  PUBLIC_API_URL: z.string().url().default('http://localhost:3000'),
+  /** Run background workers (BullMQ) in this process. The API container sets false; the worker sets true. */
+  RUN_WORKERS: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  /** local = files on disk (development, tests); r2 = Cloudflare R2 + image transformations. */
+  MEDIA_STORAGE: z.enum(['local', 'r2']).default('local'),
+  MEDIA_LOCAL_DIR: z.string().default('.media'),
+  /** Signs local upload tickets. Defaults to a value derived from JWT_SECRET. */
+  MEDIA_SIGNING_SECRET: z.string().min(32).optional(),
+  R2_ACCOUNT_ID: z.string().default(''),
+  R2_ACCESS_KEY_ID: z.string().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().default(''),
+  R2_BUCKET: z.string().default(''),
+  /** Cloudflare zone in front of the bucket with Image Transformations on, e.g. https://img.example.in */
+  MEDIA_PUBLIC_BASE_URL: z.string().default(''),
   AUTH_DEV_BYPASS: z
     .enum(['true', 'false'])
     .default('false')
@@ -40,6 +58,23 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid environment: ${problems}`);
+  }
+  const d = parsed.data;
+  if (d.MEDIA_STORAGE === 'r2') {
+    const missing = (
+      [
+        'R2_ACCOUNT_ID',
+        'R2_ACCESS_KEY_ID',
+        'R2_SECRET_ACCESS_KEY',
+        'R2_BUCKET',
+        'MEDIA_PUBLIC_BASE_URL',
+      ] as const
+    ).filter((k) => !d[k]);
+    if (missing.length)
+      throw new Error(`Invalid environment: MEDIA_STORAGE=r2 needs ${missing.join(', ')}`);
+  }
+  if (d.MEDIA_STORAGE === 'local' && d.NODE_ENV === 'production') {
+    throw new Error('Invalid environment: MEDIA_STORAGE=local is for development only');
   }
   if (parsed.data.AUTH_DEV_BYPASS && parsed.data.NODE_ENV === 'production') {
     throw new Error('Invalid environment: AUTH_DEV_BYPASS must never be enabled in production');
