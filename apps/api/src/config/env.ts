@@ -19,6 +19,13 @@ const envSchema = z.object({
    * Local development only: accept "dev|<phone>|123456" instead of a Firebase token, so the
    * app can be run before a Firebase project exists. Refused when NODE_ENV=production.
    */
+  /** Sentry error tracking. Leave empty to disable (local development). */
+  SENTRY_DSN: z.union([z.string().url(), z.literal('')]).default(''),
+  /** e.g. development, staging, production. Shown on every Sentry event. */
+  SENTRY_ENVIRONMENT: z.string().default('development'),
+  /** PostHog project API key. Leave empty to disable analytics. */
+  POSTHOG_API_KEY: z.string().default(''),
+  POSTHOG_HOST: z.string().url().default('https://eu.i.posthog.com'),
   AUTH_DEV_BYPASS: z
     .enum(['true', 'false'])
     .default('false')

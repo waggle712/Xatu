@@ -2,3 +2,4 @@
 export * from './auth.ts';
 export * from './errors.ts';
 export * from './money.ts';
+export * from './analytics.ts';

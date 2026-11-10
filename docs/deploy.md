@@ -47,13 +47,15 @@ Use separate AWS accounts (or at least separate VPCs, databases and secrets) for
 
 Store one secret per value (or one JSON secret) under `xatu/staging/...`:
 
-| Name                     | Value                                                          |
-| ------------------------ | -------------------------------------------------------------- |
-| `DATABASE_URL`           | app-user connection string (above)                             |
-| `MIGRATION_DATABASE_URL` | master-user connection string, used only by the migration task |
-| `REDIS_URL`              | `rediss://...`                                                 |
-| `JWT_SECRET`             | `openssl rand -base64 48`, different per environment           |
-| `FIREBASE_PROJECT_ID`    | the matching Firebase project (`xatu-staging` / `xatu-prod`)   |
+| Name                     | Value                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | app-user connection string (above)                                                                            |
+| `MIGRATION_DATABASE_URL` | master-user connection string, used only by the migration task                                                |
+| `REDIS_URL`              | `rediss://...`                                                                                                |
+| `JWT_SECRET`             | `openssl rand -base64 48`, different per environment                                                          |
+| `FIREBASE_PROJECT_ID`    | the matching Firebase project (`xatu-staging` / `xatu-prod`)                                                  |
+| `SENTRY_DSN`             | the API's Sentry project DSN (also set `SENTRY_ENVIRONMENT` to `staging` or `production` as a plain variable) |
+| `POSTHOG_API_KEY`        | PostHog project key (host: see `docs/analytics.md`)                                                           |
 
 Never put these in the image, the repo, or plain task environment variables.
 
@@ -131,13 +133,16 @@ aws ecs create-express-gateway-service --region ap-south-1 \
     "environment": [
       { "name": "NODE_ENV", "value": "production" },
       { "name": "PORT", "value": "3000" },
-      { "name": "TRUST_PROXY", "value": "1" }
+      { "name": "TRUST_PROXY", "value": "1" },
+      { "name": "SENTRY_ENVIRONMENT", "value": "staging" }
     ],
     "secrets": [
       { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/DATABASE_URL" },
       { "name": "REDIS_URL", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/REDIS_URL" },
       { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/JWT_SECRET" },
-      { "name": "FIREBASE_PROJECT_ID", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/FIREBASE_PROJECT_ID" }
+      { "name": "FIREBASE_PROJECT_ID", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/FIREBASE_PROJECT_ID" },
+      { "name": "SENTRY_DSN", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/SENTRY_DSN" },
+      { "name": "POSTHOG_API_KEY", "valueFrom": "arn:aws:secretsmanager:ap-south-1:'$ACCOUNT':secret:xatu/staging/POSTHOG_API_KEY" }
     ]
   }'
 ```

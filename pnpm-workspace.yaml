@@ -20,6 +20,9 @@ minimumReleaseAgeExclude:
   - '@nestjs/platform-express@12.4.2'
   - '@nestjs/testing@12.4.2'
   - dotenv@18.0.10
+  - '@posthog/core@1.66.0'
+  - '@posthog/types@1.423.0'
+  - posthog-node@5.65.0
 
 nodeLinker: hoisted
 
@@ -34,3 +37,4 @@ allowBuilds:
   '@parcel/watcher': false
   cpu-features: false
   ssh2: false
+  '@sentry/cli': true

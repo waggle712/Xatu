@@ -17,11 +17,13 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initSentry, Sentry } from '../src/lib/sentry';
 import { useSession } from '../src/store/session';
 
+initSentry();
 void SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }),
   );
@@ -80,3 +82,5 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
     </>
   );
 }
+
+export default Sentry.wrap(RootLayout);

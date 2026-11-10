@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
+import { ANALYTICS_CLIENT, type AnalyticsClient } from '../src/analytics/analytics.service.js';
 import { RATE_LIMIT_KEY_PREFIX } from '../src/common/rate-limit.js';
 import { env } from '../src/config/env.js';
 import {
@@ -27,8 +28,9 @@ describe('Auth (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   const redis = new Redis(env.REDIS_URL);
-  const run = Date.now().toString().slice(-7);
-  const phone = (n: number) => `+9170${run}${n}`.slice(0, 13);
+  const run = Date.now().toString().slice(-6);
+  // +91 and 10 digits: 7, six from the run, then a 3-digit index (unique per test).
+  const phone = (n: number) => `+917${run}${String(n).padStart(3, '0')}`;
   const uid = (n: number) => `test-${run}-${n}`;
   const token = (n: number) => `ok|${uid(n)}|${phone(n)}`;
 
@@ -37,10 +39,22 @@ describe('Auth (e2e)', () => {
     if (keys.length) await redis.del(...keys);
   };
 
+  const analyticsEvents: {
+    distinctId: string;
+    event: string;
+    properties: Record<string, unknown>;
+  }[] = [];
+  const recordingAnalytics: AnalyticsClient = {
+    capture: (input) => void analyticsEvents.push(input),
+    shutdown: async () => undefined,
+  };
+
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(FirebaseVerifier)
       .useClass(FakeFirebaseVerifier)
+      .overrideProvider(ANALYTICS_CLIENT)
+      .useValue(recordingAnalytics)
       .compile();
     app = moduleRef.createNestApplication();
     configureApp(app);
@@ -83,6 +97,16 @@ describe('Auth (e2e)', () => {
       where: { topic: 'identity.user_signed_up', aggregateId: res.body.user.id },
     });
     expect(outbox).toBe(1);
+  });
+
+  it('sends buyer_signed_up once, keyed by user id, with no phone number', async () => {
+    const first = await signIn(10).expect(200);
+    await signIn(10).expect(200);
+    const mine = analyticsEvents.filter((e) => e.distinctId === first.body.user.id);
+    expect(mine).toEqual([
+      { distinctId: first.body.user.id, event: 'buyer_signed_up', properties: { language: 'en' } },
+    ]);
+    expect(JSON.stringify(mine)).not.toContain(phone(10).slice(3));
   });
 
   it('returns the same user on the next sign-in', async () => {

@@ -43,6 +43,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-secure-store',
     'expo-localization',
+    // Native crash reporting. Source maps upload only when SENTRY_AUTH_TOKEN is set (EAS secrets).
+    [
+      '@sentry/react-native/expo',
+      { organization: process.env.SENTRY_ORG, project: process.env.SENTRY_PROJECT },
+    ],
     [
       'expo-splash-screen',
       {
