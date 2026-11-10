@@ -113,6 +113,29 @@ export class MediaService implements OnModuleDestroy {
     return asset;
   }
 
+  /** requireReady for several photos at once (all must pass). */
+  async requireReadyMany(
+    userId: string,
+    mediaIds: string[],
+    purpose: MediaPurpose,
+  ): Promise<MediaAssetRow[]> {
+    const assets: MediaAssetRow[] = [];
+    for (const id of mediaIds) assets.push(await this.requireReady(userId, id, purpose));
+    return assets;
+  }
+
+  /** Ready images by id, for other modules that store media ids (product photos). */
+  async imagesFor(mediaIds: string[]): Promise<Map<string, Image>> {
+    if (mediaIds.length === 0) return new Map();
+    const rows = await this.prisma.mediaAsset.findMany({ where: { id: { in: mediaIds } } });
+    const images = new Map<string, Image>();
+    for (const row of rows) {
+      const image = this.toImage(row);
+      if (image) images.set(row.id, image);
+    }
+    return images;
+  }
+
   /** Public image view built from the storage key (never stored URLs). */
   toImage(
     asset: Pick<

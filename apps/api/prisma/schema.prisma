@@ -122,6 +122,15 @@ enum RefundStatus {
   failed
 }
 
+/// Why a variant's stock changed. Every change writes one append-only stock_movements row.
+enum StockMovementReason {
+  listing_created
+  seller_set
+  order_sold
+  order_cancelled
+  admin_correction
+}
+
 enum ReservationStatus {
   active
   committed
@@ -318,24 +327,29 @@ model Product {
   id               String           @id @default(uuid(7)) @db.Uuid
   sellerId         String           @map("seller_id") @db.Uuid
   categoryId       String?          @map("category_id") @db.Uuid
-  title            String
+  /// Null while a draft is being written; required to publish.
+  title            String?
   titleTa          String?          @map("title_ta")
   description      String?
   descriptionTa    String?          @map("description_ta")
   sku              String?
-  pricePaise       Int              @map("price_paise")
-  /// Units on hand. Units held by active reservations are subtracted at checkout time.
-  stock            Int              @default(0)
+  /// Made after the order (cakes, custom henna). Stock still limits how many can be ordered.
+  madeToOrder      Boolean          @default(false) @map("made_to_order")
+  /// Days from order to ready. Required when made_to_order (CHECK in the migration).
+  leadTimeDays     Int?             @map("lead_time_days")
   /// Category-specific validated attributes (material, size, weight...).
   attributes       Json             @default("{}")
   fulfilmentModes  FulfilmentMode[] @default([pickup]) @map("fulfilment_modes")
   status           ProductStatus    @default(draft)
   moderationStatus ModerationStatus @default(pending) @map("moderation_status")
+  /// First time the product went live. Set once; used to send product_listed only once.
+  publishedAt      DateTime?        @map("published_at")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
   seller       SellerProfile          @relation(fields: [sellerId], references: [id], onDelete: Restrict)
   category     Category?              @relation(fields: [categoryId], references: [id])
+  variants     ProductVariant[]
   media        ProductMedia[]
   orderItems   OrderItem[]
   reservations InventoryReservation[]
@@ -347,20 +361,63 @@ model Product {
   @@map("products")
 }
 
-model ProductMedia {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  productId     String   @map("product_id") @db.Uuid
-  storageKey    String   @map("storage_key")
-  width         Int?
-  height        Int?
-  position      Int      @default(0)
-  capturedInApp Boolean  @default(false) @map("captured_in_app")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+/// A buyable option of a product (size, flavour, weight). Every product has at least one.
+/// Price and stock live here, never on the product.
+model ProductVariant {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  productId  String    @map("product_id") @db.Uuid
+  /// Shown to buyers, e.g. "1 kg" / "1 கிலோ". Null for the single default variant.
+  label      String?
+  labelTa    String?   @map("label_ta")
+  /// Validated by variantAttributesSchema in @xatu/shared (size, flavour, weight).
+  attributes Json      @default("{}")
+  pricePaise BigInt    @map("price_paise")
+  /// Units on hand (CHECK >= 0). Only changed under a row lock, with a stock_movements row.
+  stock      Int       @default(0)
+  position   Int       @default(0)
+  /// Removed variants are kept (orders point at them) but hidden.
+  deletedAt  DateTime? @map("deleted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product      Product                @relation(fields: [productId], references: [id], onDelete: Restrict)
+  movements    StockMovement[]
+  reservations InventoryReservation[]
+  orderItems   OrderItem[]
 
   @@index([productId, position])
+  @@map("product_variants")
+}
+
+/// Append-only history of every stock change. Never updated or deleted.
+model StockMovement {
+  id         String              @id @default(uuid(7)) @db.Uuid
+  variantId  String              @map("variant_id") @db.Uuid
+  delta      Int
+  stockAfter Int                 @map("stock_after")
+  reason     StockMovementReason
+  actorId    String?             @map("actor_id") @db.Uuid
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([variantId, createdAt])
+  @@map("stock_movements")
+}
+
+/// Up to 8 photos per product, in order. Each is a ready product_photo media asset owned by the seller.
+model ProductMedia {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  mediaId   String   @unique @map("media_id") @db.Uuid
+  position  Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  media   MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, position])
   @@map("product_media")
 }
 
@@ -392,6 +449,7 @@ model MediaAsset {
 
   owner      User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   shopCovers SellerProfile[] @relation("ShopCover")
+  productUse ProductMedia?
 
   @@index([ownerId, createdAt])
   @@index([status, createdAt])
@@ -426,6 +484,7 @@ model Address {
 model InventoryReservation {
   id        String            @id @default(uuid(7)) @db.Uuid
   productId String            @map("product_id") @db.Uuid
+  variantId String            @map("variant_id") @db.Uuid
   buyerId   String            @map("buyer_id") @db.Uuid
   orderId   String?           @map("order_id") @db.Uuid
   quantity  Int
@@ -434,11 +493,13 @@ model InventoryReservation {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  buyer   User    @relation(fields: [buyerId], references: [id], onDelete: Restrict)
-  order   Order?  @relation(fields: [orderId], references: [id])
+  product Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  buyer   User           @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  order   Order?         @relation(fields: [orderId], references: [id])
 
   @@index([productId, status])
+  @@index([variantId, status])
   @@index([status, expiresAt])
   @@map("inventory_reservations")
 }
@@ -451,9 +512,9 @@ model Order {
   sellerId        String         @map("seller_id") @db.Uuid
   status          OrderStatus    @default(pending_payment)
   fulfilmentMode  FulfilmentMode @map("fulfilment_mode")
-  subtotalPaise   Int            @map("subtotal_paise")
-  shippingPaise   Int            @default(0) @map("shipping_paise")
-  totalPaise      Int            @map("total_paise")
+  subtotalPaise   BigInt         @map("subtotal_paise")
+  shippingPaise   BigInt         @default(0) @map("shipping_paise")
+  totalPaise      BigInt         @map("total_paise")
   /// Copy of the delivery address at purchase time (null for pickup).
   addressSnapshot Json?          @map("address_snapshot")
   /// Copy of seller name, handle and pickup place at purchase time.
@@ -480,9 +541,11 @@ model OrderItem {
   id               String   @id @default(uuid(7)) @db.Uuid
   orderId          String   @map("order_id") @db.Uuid
   productId        String   @map("product_id") @db.Uuid
+  variantId        String   @map("variant_id") @db.Uuid
   /// Purchase-time copies, so later listing edits never change what was bought.
   titleSnapshot    String   @map("title_snapshot")
-  unitPricePaise   Int      @map("unit_price_paise")
+  variantSnapshot  String?  @map("variant_snapshot")
+  unitPricePaise   BigInt   @map("unit_price_paise")
   quantity         Int
   /// Commission in basis points (500 = 5%) from the rule active at purchase time.
   commissionBps    Int      @map("commission_bps")
@@ -492,6 +555,7 @@ model OrderItem {
 
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
   product        Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant        ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Restrict)
   commissionRule CommissionRule? @relation(fields: [commissionRuleId], references: [id])
   review         Review?
 
@@ -525,7 +589,7 @@ model Payment {
   providerOrderId   String?       @unique @map("provider_order_id")
   providerPaymentId String?       @unique @map("provider_payment_id")
   status            PaymentStatus @default(initiated)
-  amountPaise       Int           @map("amount_paise")
+  amountPaise       BigInt        @map("amount_paise")
   currency          String        @default("INR")
   failureReason     String?       @map("failure_reason")
   verifiedAt        DateTime?     @map("verified_at")
@@ -561,7 +625,7 @@ model RefundRequest {
   id               String       @id @default(uuid(7)) @db.Uuid
   orderId          String       @map("order_id") @db.Uuid
   paymentId        String       @map("payment_id") @db.Uuid
-  amountPaise      Int          @map("amount_paise")
+  amountPaise      BigInt       @map("amount_paise")
   reason           String
   status           RefundStatus @default(requested)
   providerRefundId String?      @unique @map("provider_refund_id")
@@ -634,7 +698,7 @@ model LedgerEntry {
   transactionId String          @map("transaction_id") @db.Uuid
   accountId     String          @map("account_id") @db.Uuid
   direction     LedgerDirection
-  amountPaise   Int             @map("amount_paise")
+  amountPaise   BigInt          @map("amount_paise")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
