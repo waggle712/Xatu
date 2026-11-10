@@ -139,9 +139,13 @@ export class ProfilesService {
         },
       });
       if (location) {
+        // The rounded public point is written with the exact one, always, from the same helper
+        // the shop page uses; discovery (feed, distance, map) reads only approx_location.
+        const approx = approximateLocation(location);
         await tx.$executeRaw`
           UPDATE seller_profiles
-          SET location = ST_SetSRID(ST_MakePoint(${location.lng}, ${location.lat}), 4326)::geography
+          SET location = ST_SetSRID(ST_MakePoint(${location.lng}, ${location.lat}), 4326)::geography,
+              approx_location = ST_SetSRID(ST_MakePoint(${approx.lng}, ${approx.lat}), 4326)::geography
           WHERE id = ${shop.id}::uuid`;
       }
       await this.outbox(tx, 'profiles.shop_updated', shop.id, {

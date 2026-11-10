@@ -1,6 +1,7 @@
 import type { AuthSession, Language, Me } from '@xatu/shared';
 import { create } from 'zustand';
 import { identifyUser, resetAnalytics } from '../lib/analytics';
+import { clearQueryCache } from '../lib/queryClient';
 import { setLanguage } from '../lib/i18n';
 import { setSentryUser } from '../lib/sentry';
 import { readSecure, writeSecure } from '../lib/secure';
@@ -76,6 +77,7 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   signOut: async () => {
+    await clearQueryCache();
     resetAnalytics();
     setSentryUser(null);
     await writeSecure('refreshToken', null);

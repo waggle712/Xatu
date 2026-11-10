@@ -5,10 +5,20 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { Screen } from '../../src/components/Screen';
 import { fetchMe } from '../../src/features/auth/api';
+import { HomeFeed } from '../../src/features/discovery/HomeFeed';
+import { useFeatureFlag } from '../../src/lib/analytics';
 import { formatIndianPhone } from '../../src/lib/phone';
 import { useSession } from '../../src/store/session';
 
 export default function HomeScreen() {
+  // The feed opens product pages and shop grids, which need `catalog` too.
+  const discovery = useFeatureFlag('discovery');
+  const catalog = useFeatureFlag('catalog');
+  return discovery && catalog ? <HomeFeed /> : <Welcome />;
+}
+
+/** Shown until the feed is switched on for this person. */
+function Welcome() {
   const { t } = useTranslation();
   const theme = useTheme();
   const cached = useSession((s) => s.user);

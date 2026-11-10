@@ -175,7 +175,8 @@ async function main(): Promise<void> {
     });
     await prisma.$executeRaw`
       UPDATE seller_profiles
-      SET location = ST_SetSRID(ST_MakePoint(${s.lng}, ${s.lat}), 4326)::geography
+      SET location = ST_SetSRID(ST_MakePoint(${s.lng}, ${s.lat}), 4326)::geography,
+          approx_location = ST_SetSRID(ST_MakePoint(${Math.round(s.lng * 100) / 100}, ${Math.round(s.lat * 100) / 100}), 4326)::geography
       WHERE id = ${profile.id}::uuid`;
 
     await prisma.ledgerAccount.upsert({
