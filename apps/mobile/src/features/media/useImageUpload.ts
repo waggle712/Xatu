@@ -4,6 +4,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useRef, useState } from 'react';
 import { apiRequest } from '../../lib/api';
+import { track } from '../../lib/analytics';
 import { fitWithin } from './prepare';
 
 export type UploadState =
@@ -24,6 +25,8 @@ interface Prepared {
   capturedInApp: boolean;
 }
 
+type FailReason = Extract<UploadState, { step: 'failed' }>['reason'];
+
 const POLL_MS = 1_000;
 const POLL_LIMIT = 90;
 
@@ -38,7 +41,21 @@ export function useImageUpload(purpose: MediaPurpose, aspect: [number, number]) 
   const cancelled = useRef(false);
 
   const send = useCallback(
-    async (file: Prepared): Promise<MediaAsset | null> => {
+    async (file: Prepared, isRetry: boolean): Promise<MediaAsset | null> => {
+      const startedAt = Date.now();
+      const fail = (reason: FailReason, rejectReason?: string) => {
+        setState({ step: 'failed', reason, rejectReason });
+        track('media_upload_failed', {
+          purpose,
+          reason,
+          ...(rejectReason ? { reject_reason: rejectReason.slice(0, 40) } : {}),
+        });
+      };
+      track('media_upload_started', {
+        purpose,
+        source: file.capturedInApp ? 'camera' : 'library',
+        retry: isRetry,
+      });
       try {
         setState({ step: 'uploading', progress: 0 });
         const ticket = await apiRequest<UploadTicket>('/media/uploads', {
@@ -74,28 +91,26 @@ export function useImageUpload(purpose: MediaPurpose, aspect: [number, number]) 
         for (let i = 0; asset.status === 'pending' || asset.status === 'processing'; i++) {
           if (cancelled.current) return null;
           if (i >= POLL_LIMIT) {
-            setState({ step: 'failed', reason: 'timeout' });
+            fail('timeout');
             return null;
           }
           await new Promise((r) => setTimeout(r, POLL_MS));
           asset = await apiRequest<MediaAsset>(`/media/${ticket.mediaId}`);
         }
         if (asset.status === 'rejected') {
-          setState({
-            step: 'failed',
-            reason: 'rejected',
-            rejectReason: asset.rejectReason ?? undefined,
-          });
+          fail('rejected', asset.rejectReason ?? undefined);
           return null;
         }
         setState({ step: 'ready', asset });
+        track('media_upload_succeeded', {
+          purpose,
+          media_id: asset.id,
+          byte_size: file.byteSize,
+          duration_ms: Date.now() - startedAt,
+        });
         return asset;
       } catch (err) {
-        setState({
-          step: 'failed',
-          reason:
-            err instanceof Error && /network|failed/i.test(err.message) ? 'network' : 'unknown',
-        });
+        fail(err instanceof Error && /network|failed/i.test(err.message) ? 'network' : 'unknown');
         return null;
       }
     },
@@ -111,6 +126,7 @@ export function useImageUpload(purpose: MediaPurpose, aspect: [number, number]) 
           : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
         setState({ step: 'failed', reason: 'permission' });
+        track('media_upload_failed', { purpose, reason: 'permission' });
         return null;
       }
       const options: ImagePicker.ImagePickerOptions = {
@@ -145,12 +161,15 @@ export function useImageUpload(purpose: MediaPurpose, aspect: [number, number]) 
         byteSize: info.size,
         capturedInApp: source === 'camera',
       };
-      return send(prepared.current);
+      return send(prepared.current, false);
     },
-    [aspect, send],
+    [aspect, purpose, send],
   );
 
-  const retry = useCallback(async () => (prepared.current ? send(prepared.current) : null), [send]);
+  const retry = useCallback(
+    async () => (prepared.current ? send(prepared.current, true) : null),
+    [send],
+  );
   const reset = useCallback(() => {
     cancelled.current = true;
     prepared.current = null;

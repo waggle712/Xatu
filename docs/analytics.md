@@ -31,15 +31,18 @@ The default host is PostHog EU Cloud (`https://eu.i.posthog.com`). Whether pilot
 
 Typed with strict zod schemas shared by the API and the app. Unknown properties are rejected, so personal data cannot slip in. The distinct id is always the Xatu user id (UUID), never a phone number.
 
-| Event              | Fired by                     | When                                                                    | Properties                                                 |
-| ------------------ | ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `buyer_signed_up`  | API                          | First sign-in creates the account                                       | `language`                                                 |
-| `seller_signed_up` | API (with seller onboarding) | A seller profile is created                                             | `seller_id`, `category_slug?`, `city`                      |
-| `product_listed`   | API (with catalogue)         | A product goes live                                                     | `product_id`, `seller_id`, `category_slug?`, `price_paise` |
-| `order_paid`       | API (with payments)          | Payment **verified** by webhook or server fetch, never the app callback | `order_id`, `seller_id`, `total_paise`, `fulfilment_mode`  |
-| `order_delivered`  | API (with fulfilment)        | Order reaches `completed`                                               | `order_id`, `seller_id`, `fulfilment_mode`                 |
+| Event                    | Fired by                     | When                                                                    | Properties                                                 |
+| ------------------------ | ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `buyer_signed_up`        | API                          | First sign-in creates the account                                       | `language`                                                 |
+| `seller_signed_up`       | API (with seller onboarding) | A seller profile is created                                             | `seller_id`, `category_slug?`, `city`                      |
+| `product_listed`         | API (with catalogue)         | A product goes live                                                     | `product_id`, `seller_id`, `category_slug?`, `price_paise` |
+| `order_paid`             | API (with payments)          | Payment **verified** by webhook or server fetch, never the app callback | `order_id`, `seller_id`, `total_paise`, `fulfilment_mode`  |
+| `order_delivered`        | API (with fulfilment)        | Order reaches `completed`                                               | `order_id`, `seller_id`, `fulfilment_mode`                 |
+| `media_upload_started`   | App                          | A seller picked or took a photo and the upload began                    | `purpose`, `source`, `retry`                               |
+| `media_upload_succeeded` | App                          | The worker marked the photo ready                                       | `purpose`, `media_id`, `byte_size`, `duration_ms`          |
+| `media_upload_failed`    | App                          | Permission refused, network error, timeout or rejected by the worker    | `purpose`, `reason`, `reject_reason`                       |
 
-Only `buyer_signed_up` is wired today. The others are defined so each feature sends them in the agreed shape when it is built. Money events are sent from the API, not the app, so they count only what really happened.
+`buyer_signed_up` and the three `media_upload_*` events are wired today. The others are defined so each feature sends them in the agreed shape when it is built. Money events are sent from the API, not the app, so they count only what really happened.
 
 Analytics is fire-and-forget: a PostHog failure is logged and never changes a login, order or payment. An integration test checks that sign-in still works while analytics throws.
 

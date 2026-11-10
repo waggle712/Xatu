@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const id = z.string().uuid();
 const fulfilmentMode = z.enum(['courier', 'pickup', 'local_delivery']);
+const mediaPurpose = z.enum(['shop_cover', 'product_photo']);
 
 /**
  * Pilot analytics events (30-day pilot targets). Shared by the API and the app so both
@@ -33,6 +34,25 @@ export const analyticsEvents = {
   }),
   /** The order reached `completed` (picked up or delivered). */
   order_delivered: z.strictObject({ order_id: id, seller_id: id, fulfilment_mode: fulfilmentMode }),
+  /** A seller picked or took a photo and the upload began. */
+  media_upload_started: z.strictObject({
+    purpose: mediaPurpose,
+    source: z.enum(['library', 'camera']),
+    retry: z.boolean(),
+  }),
+  /** The worker finished the photo and it is ready to show. */
+  media_upload_succeeded: z.strictObject({
+    purpose: mediaPurpose,
+    media_id: id,
+    byte_size: z.number().int().positive(),
+    duration_ms: z.number().int().nonnegative(),
+  }),
+  /** The upload or processing failed. `reject_reason` is the worker's code, e.g. `too_small`. */
+  media_upload_failed: z.strictObject({
+    purpose: mediaPurpose,
+    reason: z.enum(['permission', 'network', 'rejected', 'timeout', 'unknown']),
+    reject_reason: z.string().max(40).optional(),
+  }),
 } as const;
 
 export type AnalyticsEventName = keyof typeof analyticsEvents;
