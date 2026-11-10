@@ -11,8 +11,10 @@ import { formatIndianPhone } from '../../src/lib/phone';
 import { useSession } from '../../src/store/session';
 
 export default function HomeScreen() {
+  // The feed opens product pages and shop grids, which need `catalog` too.
   const discovery = useFeatureFlag('discovery');
-  return discovery ? <HomeFeed /> : <Welcome />;
+  const catalog = useFeatureFlag('catalog');
+  return discovery && catalog ? <HomeFeed /> : <Welcome />;
 }
 
 /** Shown until the feed is switched on for this person. */

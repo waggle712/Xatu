@@ -5,7 +5,9 @@ import { useFeatureFlag } from '../../src/lib/analytics';
 
 export default function DiscoverScreen() {
   const { t } = useTranslation();
+  // Search results open product pages, which need `catalog` too.
   const discovery = useFeatureFlag('discovery');
-  if (discovery) return <SearchScreen />;
+  const catalog = useFeatureFlag('catalog');
+  if (discovery && catalog) return <SearchScreen />;
   return <Placeholder title={t('discover.title')} body={t('discover.comingSoon')} />;
 }

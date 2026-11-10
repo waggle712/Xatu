@@ -19,7 +19,8 @@ export class DiscoveryController {
   constructor(private readonly discovery: DiscoveryService) {}
 
   @Get('feed')
-  @RateLimit({ name: 'discovery:feed', limit: 120, windowSeconds: 60 })
+  // Generous: cheap read queries, and Indian mobile carriers put many people behind one IP (CGNAT).
+  @RateLimit({ name: 'discovery:feed', limit: 600, windowSeconds: 60 })
   @ApiOperation({
     summary:
       'Home feed: live products near a point (rounded to ~1 km), best first; makers on page 1',
@@ -29,7 +30,7 @@ export class DiscoveryController {
   }
 
   @Get('search')
-  @RateLimit({ name: 'discovery:search', limit: 120, windowSeconds: 60 })
+  @RateLimit({ name: 'discovery:search', limit: 600, windowSeconds: 60 })
   @ApiOperation({ summary: 'Search Tamil and English titles and shop names, with transliteration' })
   search(@Query(new ZodValidationPipe(searchQuerySchema)) query: SearchQuery): Promise<SearchPage> {
     return this.discovery.search(query);

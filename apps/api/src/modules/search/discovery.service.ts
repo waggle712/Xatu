@@ -256,14 +256,18 @@ export class DiscoveryService {
 
   /** The query plus Tamil spellings of Latin words (and Latin spellings of Tamil words). */
   private async expand(q: string): Promise<string[]> {
+    // Whole words only (padded with spaces), so "sweet potato" never pulls in பானை via "pot".
+    const padded = ` ${q} `;
     const rows = hasTamil(q)
       ? await this.prisma.$queryRaw<{ term: string }[]>`
           SELECT DISTINCT latin AS term FROM search_transliterations
-          WHERE position(tamil IN ${q}) > 0 OR word_similarity(tamil, ${q}) >= 0.8
+          WHERE position(' ' || tamil || ' ' IN ${padded}) > 0
+             OR strict_word_similarity(tamil, ${q}) >= 0.8
           LIMIT ${MAX_TERMS - 1}`
       : await this.prisma.$queryRaw<{ term: string }[]>`
           SELECT DISTINCT tamil AS term FROM search_transliterations
-          WHERE position(latin IN ${q}) > 0 OR word_similarity(latin, ${q}) >= 0.7
+          WHERE position(' ' || latin || ' ' IN ${padded}) > 0
+             OR strict_word_similarity(latin, ${q}) >= 0.7
           LIMIT ${MAX_TERMS - 1}`;
     return [...new Set([q, ...rows.map((r) => r.term)])].slice(0, MAX_TERMS);
   }

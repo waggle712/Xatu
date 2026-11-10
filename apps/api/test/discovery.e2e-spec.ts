@@ -258,6 +258,16 @@ describe('Discovery: feed and search (e2e)', () => {
       );
     });
 
+    it('expands whole words only', async () => {
+      const potato = await http().get('/search?q=sweet%20potato').expect(200);
+      expect(potato.body.terms).not.toContain('பானை');
+      expect(potato.body.terms).toContain('இனிப்பு'); // "sweet" is a whole word
+      const shampoo = await http().get('/search?q=shampoo').expect(200);
+      expect(shampoo.body.terms).toEqual(['shampoo']);
+      const multi = await http().get('/search?q=mysore%20pak').expect(200);
+      expect(multi.body.terms).toContain('மைசூர் பாக்');
+    });
+
     it('finds products by shop name, best match first', async () => {
       const base = area();
       const s = await shop(base);

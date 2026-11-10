@@ -98,7 +98,7 @@ export const FEATURE_FLAGS = {
   discovery: {
     key: 'discovery',
     default: false,
-    description: 'Home feed, search and map',
+    description: 'Home feed, search and map. Needs `catalog` on too (cards open product pages).',
   },
   catalog: {
     key: 'catalog',
