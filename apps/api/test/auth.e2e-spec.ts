@@ -22,7 +22,7 @@ class FakeFirebaseVerifier extends FirebaseVerifier {
   }
 }
 
-// Needs the local database and Redis: pnpm db:up
+// Runs against Testcontainers (see test/global-setup.ts).
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
