@@ -9,11 +9,12 @@ import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { useCancelOrder, useOrder } from '../../src/features/orders/api';
 import { MoneyRow, OrderStatusPill } from '../../src/features/orders/parts';
+import { PayPanel } from '../../src/features/payments/PayPanel';
 import { ApiRequestError } from '../../src/lib/api';
 import { errorMessage } from '../../src/lib/errors';
 import { useSession } from '../../src/store/session';
 
-/** One order. Payment arrives in prompt 15; until then an unpaid order waits 15 minutes. */
+/** One order. An unpaid order waits 15 minutes for payment (Razorpay, test mode). */
 export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
@@ -127,6 +128,7 @@ function OrderDetails({ order }: { order: OrderView }) {
         </View>
       ) : null}
 
+      {order.status === 'awaiting_payment' ? <PayPanel order={order} /> : null}
       {order.status === 'awaiting_payment' ? (
         <Button
           variant="secondary"

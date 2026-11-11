@@ -50,6 +50,7 @@ Typed with strict zod schemas shared by the API and the app. Unknown properties 
 | `cart_item_added`        | App                          | A buyer added an item to the bag                                           | `product_id`, `quantity`                                                |
 | `order_created`          | API                          | An order was created and its stock held (awaiting payment)                 | `order_id`, `seller_id`, `total_paise`, `fulfilment_mode`, `item_count` |
 | `order_failed`           | App                          | Placing an order was refused or failed                                     | `reason` (code only)                                                    |
+| `payment_started`        | App                          | Pay tapped and Razorpay Checkout opened (never means paid)                 | `order_id`                                                              |
 | `order_cancelled`        | API                          | An unpaid order was cancelled                                              | `order_id`, `by`                                                        |
 | `order_paid`             | API (with payments)          | Payment **verified** by webhook or server fetch, never the app callback    | `order_id`, `seller_id`, `total_paise`, `fulfilment_mode`               |
 | `order_delivered`        | API (with fulfilment)        | Order reaches `completed`                                                  | `order_id`, `seller_id`, `fulfilment_mode`                              |
@@ -57,7 +58,7 @@ Typed with strict zod schemas shared by the API and the app. Unknown properties 
 | `media_upload_succeeded` | App                          | The worker marked the photo ready                                          | `purpose`, `media_id`, `byte_size`, `duration_ms`                       |
 | `media_upload_failed`    | App                          | Permission refused, network error, timeout or rejected by the worker       | `purpose`, `reason`, `reject_reason`                                    |
 
-`buyer_signed_up`, `product_draft_started`, `product_listed`, `product_viewed`, `search_performed`, `feed_item_opened`, the three `media_upload_*` events and the seven save, follow, share and report events, and the four bag and order events are wired today. The others are defined so each feature sends them in the agreed shape when it is built. Money events are sent from the API, not the app, so they count only what really happened.
+`buyer_signed_up`, `product_draft_started`, `product_listed`, `product_viewed`, `search_performed`, `feed_item_opened`, the three `media_upload_*` events and the seven save, follow, share and report events, the four bag and order events, `payment_started`, and `order_paid` (from the API after a verified payment places the order) are wired today. The others are defined so each feature sends them in the agreed shape when it is built. Money events are sent from the API, not the app, so they count only what really happened.
 
 Analytics is fire-and-forget: a PostHog failure is logged and never changes a login, order or payment. An integration test checks that sign-in still works while analytics throws.
 

@@ -189,6 +189,16 @@ Share links look like `https://<web domain>/p/<product id>` and `/s/<shop handle
 
 Until this is done, links open the web preview page, which has an "Open in app" button.
 
+## Payments (Razorpay, test mode only)
+
+No real money until the pre-launch tests (prompt 22) pass and the lawyer and CA sign off. The API refuses to start with a live key (`rzp_live_`) or any non-test key.
+
+1. Razorpay Dashboard in **Test mode** → Account & Settings → API keys: put `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET` in AWS Secrets Manager for the API **and the worker** container.
+2. Dashboard → Webhooks → Add: URL `https://<api domain>/webhooks/razorpay`, a strong secret (store as `RAZORPAY_WEBHOOK_SECRET`), events `payment.captured`, `payment.failed`, `order.paid`.
+3. Account & Settings → Payment capture: keep **automatic capture** on (the default). Xatu verifies only `captured` payments; an authorized-but-never-captured payment is refunded by Razorpay automatically.
+4. The worker container (`RUN_WORKERS=true`) runs the webhook processor, the outbox relay (every 2 s) and the payments poller (every minute). Without it, webhooks are stored but nothing is processed.
+5. Check: make a test payment with UPI `success@razorpay`; the order becomes `placed` within seconds. Then re-record the webhook fixtures in `apps/api/test/fixtures/razorpay` from the real deliveries.
+
 ## Rollback
 
 - **Bad image:** run `update-express-gateway-service` again with the **previous tag** (images are immutable, so the old tag is exactly what ran before). Because migrations are expand-only, the old image works against the current database.

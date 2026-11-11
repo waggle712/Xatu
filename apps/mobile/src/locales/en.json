@@ -79,7 +79,10 @@
       "invalid_order_status": "This order can't be changed now.",
       "order_not_found": "Order not found.",
       "idempotency_in_progress": "Still working on it. Try again in a moment.",
-      "too_many_unpaid_orders": "You have unpaid orders waiting. Pay or cancel one first."
+      "too_many_unpaid_orders": "You have unpaid orders waiting. Pay or cancel one first.",
+      "payments_unavailable": "Online payment isn't available right now. Please try again shortly.",
+      "already_paid": "This order is already paid.",
+      "payment_not_found": "Payment not found."
     }
   },
   "tabs": {
@@ -517,7 +520,7 @@
     "notFound": "Order not found",
     "notFoundBody": "It may belong to another account.",
     "awaitingTitle": "Items kept for you until {{time}}",
-    "awaitingBody": "Online payment is coming soon. If the order isn't paid in time, the items go back on sale.",
+    "awaitingBody": "Pay before then. If it isn't paid in time, the items go back on sale.",
     "expiredBody": "This order wasn't paid in time, so the items went back on sale.",
     "cancel": "Cancel order",
     "cancelTitle": "Cancel this order?",
@@ -540,5 +543,14 @@
     "in_dispute": "Being looked into",
     "refunded": "Refunded",
     "partially_refunded": "Partly refunded"
+  },
+  "pay": {
+    "button": "Pay {{amount}}",
+    "upiHint": "UPI first: GPay, PhonePe, Paytm or any UPI app. Cards and net banking also work.",
+    "confirming": "Confirming payment…",
+    "confirmingBody": "This takes a few seconds. You can leave this screen; we'll update your order.",
+    "confirmingSlow": "Your bank is taking longer than usual. We'll update your order as soon as it confirms. You can close the app.",
+    "cancelled": "Payment not completed. You can try again.",
+    "failed": "The payment didn't go through. Try again or use another UPI app."
   }
 }

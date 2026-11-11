@@ -9,7 +9,13 @@ import { canTransitionOrder } from './orders.ts';
 
 describe('payment state machine (separate from the order one)', () => {
   it('follows the happy path', () => {
-    const path: PaymentStatus[] = ['initiated', 'pending', 'verified', 'settlement_eligible', 'settled'];
+    const path: PaymentStatus[] = [
+      'initiated',
+      'pending',
+      'verified',
+      'settlement_eligible',
+      'settled',
+    ];
     for (let i = 1; i < path.length; i++) {
       expect(canTransitionPayment(path[i - 1]!, path[i]!), path[i]).toBe(true);
     }
