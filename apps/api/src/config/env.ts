@@ -44,6 +44,32 @@ const envSchema = z.object({
   R2_BUCKET: z.string().default(''),
   /** Cloudflare zone in front of the bucket with Image Transformations on, e.g. https://img.example.in */
   MEDIA_PUBLIC_BASE_URL: z.string().default(''),
+  /**
+   * Public web address for share links and their preview pages, e.g. https://example.in (no
+   * trailing slash). Empty = share links use PUBLIC_API_URL (local development).
+   */
+  PUBLIC_WEB_URL: z.union([z.string().url(), z.literal('')]).default(''),
+  /** Apple Developer Team ID for iOS universal links. Empty = no apple-app-site-association. */
+  APPLE_TEAM_ID: z
+    .string()
+    .regex(/^([A-Z0-9]{10})?$/, 'APPLE_TEAM_ID is 10 capital letters or digits')
+    .default(''),
+  /**
+   * SHA-256 fingerprints of the Android signing certificates (Play app signing key, plus the
+   * upload key if wanted), comma separated, for Android App Links. Empty = no assetlinks.json.
+   */
+  ANDROID_CERT_SHA256: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((f) => f.trim().toUpperCase())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().regex(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/, 'Bad SHA-256 fingerprint'))),
+  /** App Store page for the preview page's download button. Empty = no App Store button. */
+  APP_STORE_URL: z.union([z.string().url(), z.literal('')]).default(''),
   AUTH_DEV_BYPASS: z
     .enum(['true', 'false'])
     .default('false')

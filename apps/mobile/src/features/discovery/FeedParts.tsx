@@ -19,6 +19,7 @@ import { HexAvatar } from '../../components/HexAvatar';
 import { XImage } from '../../components/XImage';
 import { track } from '../../lib/analytics';
 import { useSession } from '../../store/session';
+import { SaveButton } from '../social/SocialButtons';
 
 const googleMapsConfigured =
   (Constants.expoConfig?.extra as { googleMapsConfigured?: boolean } | undefined)
@@ -94,49 +95,59 @@ export const FeedCard = memo(function FeedCard({
         </View>
       </Pressable>
 
-      <Pressable
-        accessibilityRole="link"
-        accessibilityLabel={[title, priceText(item, t), item.inStock ? null : t('catalog.soldOut')]
-          .filter(Boolean)
-          .join(', ')}
-        onPress={open}
-      >
-        <XImage
-          image={item.photo}
-          aspectRatio={1}
-          borderRadius={theme.radius.lg}
-          accessibilityLabel={title}
-        />
-        <View
-          style={{
-            position: 'absolute',
-            left: theme.space[3],
-            right: theme.space[3],
-            bottom: theme.space[3],
-            flexDirection: 'row',
-          }}
-          pointerEvents="none"
+      <View>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={[
+            title,
+            priceText(item, t),
+            item.inStock ? null : t('catalog.soldOut'),
+          ]
+            .filter(Boolean)
+            .join(', ')}
+          onPress={open}
         >
+          <XImage
+            image={item.photo}
+            aspectRatio={1}
+            borderRadius={theme.radius.lg}
+            accessibilityLabel={title}
+          />
           <View
             style={{
-              flexShrink: 1,
+              position: 'absolute',
+              left: theme.space[3],
+              right: theme.space[3],
+              bottom: theme.space[3],
               flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.space[2],
-              paddingHorizontal: theme.space[4],
-              paddingVertical: theme.space[2],
-              borderRadius: theme.radius.pill,
-              backgroundColor: theme.colors.surfaceRaised,
             }}
+            pointerEvents="none"
           >
-            <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {title}
-            </Text>
-            <Text variant="heading">{priceText(item, t)}</Text>
-            <ChevronRight size={18} strokeWidth={1.75} color={theme.colors.ink} />
+            <View
+              style={{
+                flexShrink: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.space[2],
+                paddingHorizontal: theme.space[4],
+                paddingVertical: theme.space[2],
+                borderRadius: theme.radius.pill,
+                backgroundColor: theme.colors.surfaceRaised,
+              }}
+            >
+              <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {title}
+              </Text>
+              <Text variant="heading">{priceText(item, t)}</Text>
+              <ChevronRight size={18} strokeWidth={1.75} color={theme.colors.ink} />
+            </View>
           </View>
+        </Pressable>
+        {/* A sibling, not a child, so screen readers reach it separately from the photo link. */}
+        <View style={{ position: 'absolute', top: theme.space[3], right: theme.space[3] }}>
+          <SaveButton productId={item.id} title={title} source={source} overlay />
         </View>
-      </Pressable>
+      </View>
 
       {!item.inStock ? (
         <Text variant="caption" color="critical">

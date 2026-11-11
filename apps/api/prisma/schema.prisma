@@ -201,6 +201,8 @@ model User {
   reports         Report[]               @relation("Reporter")
   idempotencyKeys IdempotencyKey[]
   mediaAssets     MediaAsset[]
+  savedProducts   SavedProduct[]
+  follows         ShopFollow[]
 
   @@map("users")
 }
@@ -292,12 +294,13 @@ model SellerProfile {
   createdAt          DateTime                               @default(now()) @map("created_at")
   updatedAt          DateTime                               @updatedAt @map("updated_at")
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  category   Category?   @relation(fields: [categoryId], references: [id])
-  coverMedia MediaAsset? @relation("ShopCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category   Category?    @relation(fields: [categoryId], references: [id])
+  coverMedia MediaAsset?  @relation("ShopCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
   products   Product[]
-  orders     Order[]     @relation("SellerOrders")
+  orders     Order[]      @relation("SellerOrders")
   reviews    Review[]
+  followers  ShopFollow[]
 
   @@index([city, status])
   @@index([pincode])
@@ -305,6 +308,22 @@ model SellerProfile {
   @@index([approxLocation], type: Gist, map: "seller_profiles_approx_location_gist_idx")
   @@index([businessName(ops: raw("gin_trgm_ops"))], type: Gin, map: "seller_profiles_business_name_trgm_idx")
   @@map("seller_profiles")
+}
+
+/// A buyer following a maker. Owned by profiles.
+model ShopFollow {
+  userId    String   @map("user_id") @db.Uuid
+  sellerId  String   @map("seller_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seller SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sellerId])
+  @@index([userId, createdAt])
+  @@index([sellerId])
+  @@map("shop_follows")
 }
 
 // ───────────────────────────── Catalog ─────────────────────────────
@@ -357,6 +376,7 @@ model Product {
   media        ProductMedia[]
   orderItems   OrderItem[]
   reservations InventoryReservation[]
+  savedBy      SavedProduct[]
 
   @@unique([sellerId, sku])
   @@index([sellerId, status])
@@ -425,6 +445,23 @@ model ProductMedia {
 
   @@unique([productId, position])
   @@map("product_media")
+}
+
+/// A buyer's saved product (the heart). Owned by catalog. Kept while the product is paused or
+/// sold out (prompt 25 sends back-in-stock alerts); the Saved list shows only public ones.
+model SavedProduct {
+  userId    String   @map("user_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId])
+  @@map("saved_products")
 }
 
 // ───────────────────────────── Media ─────────────────────────────
@@ -774,6 +811,8 @@ model Report {
 
   reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Restrict)
 
+  // One open report per reporter and target: partial unique index reports_one_open_per_target
+  // (status open or reviewing) is in the migration; Prisma can't express partial indexes.
   @@index([status, createdAt])
   @@index([targetType, targetId])
   @@map("reports")

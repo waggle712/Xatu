@@ -177,6 +177,7 @@ export const publicShopSchema = z.object({
   verified: z.boolean(),
   liveProductCount: z.number().int(),
   completedOrderCount: z.number().int(),
+  followerCount: z.number().int(),
 });
 export type PublicShop = z.infer<typeof publicShopSchema>;
 

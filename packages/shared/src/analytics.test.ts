@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { analyticsEvents, FEATURE_FLAGS, parseAnalyticsEvent } from './analytics.ts';
 
 describe('analytics events', () => {
-  it('defines exactly the pilot and media events', () => {
+  it('defines exactly the pilot, media, discovery and social events', () => {
     expect(Object.keys(analyticsEvents).sort()).toEqual(
       [
         'buyer_signed_up',
@@ -17,6 +17,13 @@ describe('analytics events', () => {
         'product_viewed',
         'search_performed',
         'seller_signed_up',
+        'product_saved',
+        'product_unsaved',
+        'shop_followed',
+        'shop_unfollowed',
+        'share_tapped',
+        'share_link_opened',
+        'report_submitted',
       ].sort(),
     );
   });

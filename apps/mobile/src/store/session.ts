@@ -5,6 +5,7 @@ import { clearQueryCache } from '../lib/queryClient';
 import { setLanguage } from '../lib/i18n';
 import { setSentryUser } from '../lib/sentry';
 import { readSecure, writeSecure } from '../lib/secure';
+import { clearPendingLink } from '../lib/pendingLink';
 
 type Status = 'loading' | 'signedOut' | 'signedIn';
 
@@ -77,6 +78,7 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   signOut: async () => {
+    clearPendingLink();
     await clearQueryCache();
     resetAnalytics();
     setSentryUser(null);

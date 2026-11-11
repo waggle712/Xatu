@@ -1,7 +1,7 @@
 import { type PublicShop, WEEKDAYS } from '@xatu/shared';
 import { NearMeIcon, PickupSlotIcon, Text, TrustBadge, useTheme } from '@xatu/ui';
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,8 +11,10 @@ import { XImage } from '../../src/components/XImage';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { ShopProductGrid } from '../../src/features/catalog/ProductLists';
 import { usePublicShop } from '../../src/features/shop/api';
+import { FollowButton, ReportLink, ShareButton } from '../../src/features/social/SocialButtons';
 import { useFeatureFlag } from '../../src/lib/analytics';
 import { errorMessage } from '../../src/lib/errors';
+import { clearPendingLink } from '../../src/lib/pendingLink';
 import { useSession } from '../../src/store/session';
 
 export default function PublicShopScreen() {
@@ -20,6 +22,7 @@ export default function PublicShopScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const query = usePublicShop(handle);
+  useEffect(() => clearPendingLink(`/s/${handle}`), [handle]);
 
   return (
     <SafeAreaView
@@ -37,6 +40,15 @@ export default function PublicShopScreen() {
           <Text variant="heading" numberOfLines={1} style={{ flex: 1 }}>
             {handle}
           </Text>
+          {query.data ? (
+            <ShareButton
+              subject={{
+                type: 'shop',
+                handle: query.data.handle,
+                businessName: query.data.businessName,
+              }}
+            />
+          ) : null}
         </View>
         <OfflineBanner />
         {query.isPending ? (
@@ -76,9 +88,11 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
         <HexAvatar name={shop.businessName} />
         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around' }}>
           <Stat value={shop.liveProductCount} label={t('shop.public.products')} />
+          <Stat value={shop.followerCount} label={t('social.followers')} />
           <Stat value={shop.completedOrderCount} label={t('shop.public.completed')} />
         </View>
       </View>
+      <FollowButton handle={shop.handle} businessName={shop.businessName} />
 
       <View style={{ gap: theme.space[2] }}>
         <Text variant="title" accessibilityRole="header">
@@ -178,6 +192,7 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
       ) : (
         <EmptyState title={t('shop.public.noReviews')} body={t('shop.public.noReviewsBody')} />
       )}
+      <ReportLink target={{ type: 'shop', handle: shop.handle }} />
     </View>
   );
 }

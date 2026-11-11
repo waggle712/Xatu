@@ -32,6 +32,10 @@ const KNOWN_CODES = [
   'lead_time_invalid',
   'stock_changed',
   'invalid_cursor',
+  'saved_list_full',
+  'following_list_full',
+  'cannot_follow_own_shop',
+  'cannot_report_own',
 ] as const;
 
 /** Any error → a short message in the person's language. Never shows raw server text. */
