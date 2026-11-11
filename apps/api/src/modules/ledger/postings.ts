@@ -172,6 +172,17 @@ export function gatewayFeePosting(i: { entityId: string; feePaise: bigint; taxPa
   });
 }
 
+/** A refund Razorpay took out of a settlement: it comes off what reached our bank. */
+export function refundSettlementPosting(i: { entityId: string; amountPaise: bigint }) {
+  return build({
+    idempotencyKey: `refund_settlement:${i.entityId}`,
+    kind: 'provider_refund_settlement',
+    referenceId: i.entityId,
+    description: 'Refund deducted from a Razorpay settlement',
+    entries: [dr(ACCOUNTS.providerClearing, i.amountPaise), cr(ACCOUNTS.bank, i.amountPaise)],
+  });
+}
+
 /** Razorpay settled money to our bank account. */
 export function providerSettlementPosting(i: { entityId: string; amountPaise: bigint }) {
   return build({

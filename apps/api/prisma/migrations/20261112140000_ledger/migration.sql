@@ -1,3 +1,6 @@
+-- Prompt 16: money ledger. One transaction, so a failure (e.g. no CREATEROLE) leaves nothing half-done.
+BEGIN;
+
 -- CreateEnum
 CREATE TYPE "SettlementStatus" AS ENUM ('pending_approval', 'approved', 'exported', 'paid', 'cancelled');
 
@@ -206,6 +209,8 @@ GRANT USAGE ON SCHEMA public TO xatu_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO xatu_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO xatu_app;
 REVOKE UPDATE, DELETE, TRUNCATE ON "ledger_accounts", "ledger_transactions", "ledger_entries" FROM xatu_app;
+-- History too: a deleted settlement line would pay that order out again; rates are dated history.
+REVOKE UPDATE, DELETE, TRUNCATE ON "settlement_lines", "finance_rates" FROM xatu_app;
 -- Prisma's own bookkeeping is for migrations only.
 REVOKE ALL ON "_prisma_migrations" FROM xatu_app;
 -- Tables from future migrations (created by the same owner) get the normal grants automatically;
@@ -243,3 +248,5 @@ ALTER TABLE "settlement_lines" ADD CONSTRAINT "settlement_lines_money_check" CHE
   AND "net_paise" = "gross_paise" - "commission_paise" - "commission_gst_paise" - "tcs_paise" - "tds_paise");
 CREATE UNIQUE INDEX "refund_requests_one_open_per_payment" ON "refund_requests"("payment_id")
   WHERE "status" IN ('requested', 'approved', 'processing');
+
+COMMIT;

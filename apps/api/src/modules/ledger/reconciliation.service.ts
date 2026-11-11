@@ -4,7 +4,11 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { PaymentsService } from '../payments/payments.service.js';
 import { RAZORPAY_CLIENT, type RazorpayClient } from '../payments/razorpay.client.js';
 import { LedgerService } from './ledger.service.js';
-import { gatewayFeePosting, providerSettlementPosting } from './postings.js';
+import {
+  gatewayFeePosting,
+  providerSettlementPosting,
+  refundSettlementPosting,
+} from './postings.js';
 import { istDay } from './settlements.service.js';
 
 /** A verified payment not in any settlement report this long after is flagged (Razorpay is ~T+2). */
@@ -81,14 +85,19 @@ export class ReconciliationService {
         }
       } else if (item.type === 'refund') {
         const ours = refunds.get(item.entity_id);
-        if (!ours)
+        if (!ours) {
           issues.push({ kind: 'unknown_in_report', entityId: item.entity_id, details: { item } });
-        else if (BigInt(item.amount) !== ours.amountPaise) {
+        } else if (BigInt(item.amount) !== ours.amountPaise) {
           issues.push({
             kind: 'amount_mismatch',
             entityId: item.entity_id,
             details: { ours: String(ours.amountPaise), razorpay: item.amount },
           });
+        } else if (item.settled) {
+          // Razorpay takes refunds out of the settlement: less reached the bank.
+          await this.ledger.post(
+            refundSettlementPosting({ entityId: item.entity_id, amountPaise: BigInt(item.amount) }),
+          );
         }
       } else {
         issues.push({ kind: 'needs_review', entityId: item.entity_id, details: { item } });

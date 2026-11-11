@@ -3,6 +3,7 @@
 //   node dist/src/cli/finance.js list
 //   node dist/src/cli/finance.js approve --admin-phone +91XXXXXXXXXX --reason "Checked" <batchId> [batchId...]
 //   node dist/src/cli/finance.js export --admin-phone +91XXXXXXXXXX --reason "Bank upload" --out payouts.csv
+//   node dist/src/cli/finance.js re-export --admin-phone +91XXXXXXXXXX --reason "File lost" --out again.csv <batchId>...
 //   node dist/src/cli/finance.js mark-paid --admin-phone +91XXXXXXXXXX --reason "Sent" --reference UTR123 <batchId>
 // Every action needs an active admin and a reason, and is written to admin_audit_logs.
 import './no-workers.js';
@@ -35,6 +36,12 @@ async function main(): Promise<void> {
       if (!v) throw new Error(`--${k} is required`);
       return v;
     };
+    const needOut = () => {
+      if (!values.out) throw new Error('--out is required');
+      // Fails if the file exists (never overwrite an earlier export) or the folder isn't writable.
+      writeFileSync(values.out, '', { flag: 'wx' });
+      return values.out;
+    };
     switch (command) {
       case 'list': {
         const batches = await app.get(PrismaService).settlementBatch.findMany({
@@ -55,13 +62,25 @@ async function main(): Promise<void> {
         );
         break;
       case 'export': {
-        if (!values.out) throw new Error('--out is required');
+        // The file is created BEFORE any batch changes status, so a bad path can't lose the export.
+        const out = needOut();
         const csv = await finance.exportCsv({
           adminPhone: need('admin-phone'),
           reason: need('reason'),
         });
-        writeFileSync(values.out, csv, { flag: 'wx' }); // never overwrite an earlier export
-        console.log(`Wrote ${values.out}`);
+        writeFileSync(out, csv);
+        console.log(`Wrote ${out}`);
+        break;
+      }
+      case 're-export': {
+        const out = needOut();
+        const csv = await finance.reexportCsv({
+          batchIds: ids,
+          adminPhone: need('admin-phone'),
+          reason: need('reason'),
+        });
+        writeFileSync(out, csv);
+        console.log(`Wrote ${out}`);
         break;
       }
       case 'mark-paid':
@@ -76,7 +95,7 @@ async function main(): Promise<void> {
         console.log(`Marked ${ids[0]} paid`);
         break;
       default:
-        throw new Error('Commands: list, approve, export, mark-paid');
+        throw new Error('Commands: list, approve, export, re-export, mark-paid');
     }
   } finally {
     await app.close();

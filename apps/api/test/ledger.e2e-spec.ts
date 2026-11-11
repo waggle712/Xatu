@@ -544,6 +544,106 @@ describe('Ledger, refunds, settlements and reconciliation (e2e)', () => {
     expect(await txnsFor(good.providerPaymentId)).toHaveLength(2);
   });
 
+  it('a refund settled by Razorpay comes off the bank: clearing nets to zero', async () => {
+    const o = await paidOrder({ price: 60_000n });
+    // Refund this (placed) payment's money outside the order flow, as a reconciliation fixture.
+    const refund = await prisma.refundRequest.create({
+      data: {
+        orderId: o.orderId,
+        paymentId: o.paymentId,
+        amountPaise: 10_000n,
+        reason: 'test',
+        status: 'completed',
+        providerRefundId: `rfnd_t${Date.now()}`,
+      },
+    });
+    await app.get(LedgerService).backfill(); // posts the processed refund
+    razorpay.recon = [
+      {
+        entity_id: o.providerPaymentId,
+        type: 'payment',
+        amount: 60_000,
+        fee: 1_180,
+        tax: 180,
+        settled: true,
+        settlement_id: 'setl_2',
+        order_id: o.providerOrderId,
+      },
+      {
+        entity_id: refund.providerRefundId!,
+        type: 'refund',
+        amount: 10_000,
+        fee: 0,
+        tax: 0,
+        settled: true,
+        settlement_id: 'setl_2',
+        order_id: null,
+      },
+    ];
+    await app.get(ReconciliationService).reconcile(new Date());
+    const refs = [o.paymentId, o.providerPaymentId, refund.id, refund.providerRefundId!];
+    const rows = await prisma.$queryRaw<{ code: string; net: bigint }[]>`
+      SELECT a.code, SUM(CASE WHEN e.direction = 'debit' THEN e.amount_paise ELSE -e.amount_paise END)::bigint AS net
+      FROM ledger_entries e JOIN ledger_accounts a ON a.id = e.account_id JOIN ledger_transactions t ON t.id = e.transaction_id
+      WHERE t.reference_id = ANY(${refs}) GROUP BY a.code`;
+    const net = Object.fromEntries(rows.map((r) => [r.code, r.net]));
+    expect(net.provider_clearing).toBe(0n);
+    expect(net.bank).toBe(60_000n - 1_180n - 10_000n);
+  });
+
+  it('settles orders beyond the first page of candidates', async () => {
+    const s = await shop();
+    const first = await paidOrder({ sellerId: s.id });
+    await complete(first.orderId, 72);
+    await app.get(SettlementsService).createBatches(new Date(), 1);
+    const later = await paidOrder({ sellerId: s.id });
+    await complete(later.orderId, 50);
+    // Page size 1: the first page holds only the already-settled order; the next must still be read.
+    await app.get(SettlementsService).createBatches(new Date(), 1);
+    expect(
+      await prisma.settlementLine.count({
+        where: { orderId: { in: [first.orderId, later.orderId] } },
+      }),
+    ).toBe(2);
+  });
+
+  it('settlement lines and rates are history: the app role cannot change them', async () => {
+    await expect(prisma.$executeRaw`DELETE FROM settlement_lines`).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(prisma.$executeRaw`UPDATE finance_rates SET rate_bps = 0`).rejects.toThrow(
+      /permission denied/,
+    );
+  });
+
+  it('a lost CSV can be rebuilt for exported batches, audited, without changing them', async () => {
+    const s = await shop();
+    const o = await paidOrder({ sellerId: s.id });
+    await complete(o.orderId, 50);
+    await app.get(SettlementsService).createBatches(new Date());
+    const batch = await prisma.settlementBatch.findFirstOrThrow({ where: { sellerId: s.id } });
+    const admin = await signInNewUser(app);
+    await prisma.user.update({ where: { id: admin.userId }, data: { roles: ['buyer', 'admin'] } });
+    const phone = (await prisma.user.findUniqueOrThrow({ where: { id: admin.userId } })).phone;
+    const finance = app.get(FinanceService);
+    await finance.approve({ batchIds: [batch.id], adminPhone: phone, reason: 'ok' });
+    await finance.exportCsv({ adminPhone: phone, reason: 'upload' }); // pretend the file was lost
+    const again = await finance.reexportCsv({
+      batchIds: [batch.id],
+      adminPhone: phone,
+      reason: 'File lost',
+    });
+    expect(again).toContain(batch.id);
+    expect(
+      (await prisma.settlementBatch.findUniqueOrThrow({ where: { id: batch.id } })).status,
+    ).toBe('exported');
+    expect(
+      await prisma.adminAuditLog.count({
+        where: { targetId: batch.id, action: 'settlement.reexport' },
+      }),
+    ).toBe(1);
+  });
+
   it('every account in the ledger balances overall', async () => {
     const rows = await prisma.$queryRaw<{ debit: bigint; credit: bigint }[]>`
       SELECT COALESCE(SUM(amount_paise) FILTER (WHERE direction = 'debit'), 0)::bigint AS debit,

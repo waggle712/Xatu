@@ -32,17 +32,26 @@ export class SettlementsService {
   ) {}
 
   /** Safe to run any number of times: an order already in a batch is never added again. */
-  async createBatches(now: Date): Promise<number> {
-    const candidates = await this.orders.settlementCandidates(
-      new Date(now.getTime() - DISPUTE_WINDOW_MS),
-    );
-    if (candidates.length === 0) return 0;
-    const settled = await this.prisma.settlementLine.findMany({
-      where: { orderId: { in: candidates } },
-      select: { orderId: true },
-    });
-    const done = new Set(settled.map((l) => l.orderId));
-    const facts = await this.orders.ledgerFacts(candidates.filter((id) => !done.has(id)));
+  async createBatches(now: Date, pageSize = 500): Promise<number> {
+    // Every candidate, page by page: settled orders stay `completed`, so never stop at one page.
+    const cutoff = new Date(now.getTime() - DISPUTE_WINDOW_MS);
+    const pending: string[] = [];
+    let after: { completedAt: Date; id: string } | null = null;
+    for (;;) {
+      const page = await this.orders.settlementCandidates(cutoff, after, pageSize);
+      if (page.length === 0) break;
+      const ids = page.map((p) => p.id);
+      const settled = await this.prisma.settlementLine.findMany({
+        where: { orderId: { in: ids } },
+        select: { orderId: true },
+      });
+      const done = new Set(settled.map((l) => l.orderId));
+      pending.push(...ids.filter((id) => !done.has(id)));
+      after = page[page.length - 1]!;
+      if (page.length < pageSize) break;
+    }
+    if (pending.length === 0) return 0;
+    const facts = await this.orders.ledgerFacts(pending);
     const rates = await this.prisma.financeRate.findMany();
     const bySeller = new Map<
       string,

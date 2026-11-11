@@ -194,7 +194,7 @@ Until this is done, links open the web preview page, which has an "Open in app" 
 No real money until the pre-launch tests (prompt 22) pass and the lawyer and CA sign off. The API refuses to start with a live key (`rzp_live_`) or any non-test key.
 
 1. Razorpay Dashboard in **Test mode** → Account & Settings → API keys: put `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET` in AWS Secrets Manager for the API **and the worker** container.
-2. Dashboard → Webhooks → Add: URL `https://<api domain>/webhooks/razorpay`, a strong secret (store as `RAZORPAY_WEBHOOK_SECRET`), events `payment.captured`, `payment.failed`, `order.paid`.
+2. Dashboard → Webhooks → Add: URL `https://<api domain>/webhooks/razorpay`, a strong secret (store as `RAZORPAY_WEBHOOK_SECRET`), events `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `refund.failed` (without the refund events, refunds still complete through the 10-minute poller).
 3. Account & Settings → Payment capture: keep **automatic capture** on (the default). Xatu verifies only `captured` payments; an authorized-but-never-captured payment is refunded by Razorpay automatically.
 4. The worker container (`RUN_WORKERS=true`) runs the webhook processor, the outbox relay (every 2 s) and the payments poller (every minute). Without it, webhooks are stored but nothing is processed.
 5. Check: make a test payment with UPI `success@razorpay`; the order becomes `placed` within seconds. Then re-record the webhook fixtures in `apps/api/test/fixtures/razorpay` from the real deliveries.
@@ -203,7 +203,7 @@ No real money until the pre-launch tests (prompt 22) pass and the lawyer and CA 
 
 **The app connects as a restricted user.** Migrations create a `xatu_app` role (no login) that may only SELECT and INSERT on the ledger tables (`ledger_accounts`, `ledger_transactions`, `ledger_entries`) and do normal reads and writes elsewhere. Migrations keep running as the owner.
 
-1. Once, as the RDS owner (the migration user needs `CREATEROLE`): `CREATE ROLE xatu_api LOGIN PASSWORD '<from Secrets Manager>' IN ROLE xatu_app;`. Never put this password in a migration or the repo.
+1. Deploy order: run the migration (as the owner) BEFORE switching the app's `DATABASE_URL`. Then once, as the RDS owner (the migration user needs `CREATEROLE`; the migration is one transaction, so without it nothing is applied): `CREATE ROLE xatu_api LOGIN PASSWORD '<from Secrets Manager>' IN ROLE xatu_app;`. Never put this password in a migration or the repo.
 2. API and worker containers: `DATABASE_URL` uses `xatu_api`. The migration task keeps the owner's URL.
 3. A future migration that adds a ledger table must `REVOKE UPDATE, DELETE` on it from `xatu_app` (default privileges grant them).
 
@@ -215,6 +215,7 @@ No real money until the pre-launch tests (prompt 22) pass and the lawyer and CA 
 node dist/src/cli/finance.js list
 node dist/src/cli/finance.js approve --admin-phone +91XXXXXXXXXX --reason "Checked" <batchId> ...
 node dist/src/cli/finance.js export --admin-phone +91XXXXXXXXXX --reason "Bank upload" --out payouts.csv
+node dist/src/cli/finance.js re-export --admin-phone +91XXXXXXXXXX --reason "File lost" --out again.csv <batchId> ...
 node dist/src/cli/finance.js mark-paid --admin-phone +91XXXXXXXXXX --reason "Sent" --reference <UTR> <batchId>
 ```
 

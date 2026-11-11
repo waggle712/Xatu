@@ -366,15 +366,33 @@ export class OrdersService {
     return new Map(rows.map((r) => [r.id, r]));
   }
 
-  /** Completed orders past the dispute window (not disputed or refunded: status is `completed`). */
-  async settlementCandidates(completedBefore: Date, limit = 5_000): Promise<string[]> {
+  /**
+   * Completed orders past the dispute window (status still `completed`: no dispute or refund),
+   * oldest first, one keyset page at a time on (completed_at, id).
+   */
+  async settlementCandidates(
+    completedBefore: Date,
+    after: { completedAt: Date; id: string } | null,
+    limit = 500,
+  ): Promise<{ id: string; completedAt: Date }[]> {
     const rows = await this.prisma.order.findMany({
-      where: { status: 'completed', completedAt: { lte: completedBefore } },
-      select: { id: true },
-      orderBy: { completedAt: 'asc' },
+      where: {
+        status: 'completed',
+        completedAt: { lte: completedBefore },
+        ...(after
+          ? {
+              OR: [
+                { completedAt: { gt: after.completedAt } },
+                { completedAt: after.completedAt, id: { gt: after.id } },
+              ],
+            }
+          : {}),
+      },
+      select: { id: true, completedAt: true },
+      orderBy: [{ completedAt: 'asc' }, { id: 'asc' }],
       take: limit,
     });
-    return rows.map((r) => r.id);
+    return rows.map((r) => ({ id: r.id, completedAt: r.completedAt! }));
   }
 
   /** Orders that were placed (paid) at some point and not refunded, for the completeness check. */

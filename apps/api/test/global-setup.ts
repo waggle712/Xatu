@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
+import pg_ from 'pg';
+
+const { Client } = pg_;
 
 let pg: StartedPostgreSqlContainer | undefined;
 let redis: StartedRedisContainer | undefined;
@@ -48,10 +51,11 @@ export async function setup(): Promise<void> {
   // SELECT and INSERT on ledger tables. Migrations above ran as the owner.
   const appUser = 'xatu_app_test';
   const appPassword = 'app_test_only_password';
-  execSync(
-    `docker exec ${pg.getId()} psql -U xatu -d xatu_test -v ON_ERROR_STOP=1 -c "CREATE ROLE ${appUser} LOGIN PASSWORD '${appPassword}' IN ROLE xatu_app"`,
-    { stdio: 'inherit' },
-  );
+  const owner = new Client({ connectionString: pg.getConnectionUri() });
+  await owner.connect();
+  await owner.query(`CREATE ROLE ${appUser} LOGIN PASSWORD '${appPassword}' IN ROLE xatu_app`);
+  await owner.end();
+
   const url = new URL(pg.getConnectionUri());
   url.username = appUser;
   url.password = appPassword;

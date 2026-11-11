@@ -57,6 +57,39 @@ export class FinanceService {
       where: { status: 'approved' },
       orderBy: { businessDay: 'asc' },
     });
+    const csv = await this.csvFor(batches);
+    for (const before of batches) {
+      await this.prisma.$transaction(async (tx) => {
+        const after = await tx.settlementBatch.update({
+          where: { id: before.id, status: 'approved' },
+          data: { status: 'exported', exportedAt: new Date() },
+        });
+        await this.audit(tx, admin, 'settlement.export', before, after, input.reason);
+      });
+    }
+    return csv;
+  }
+
+  /** The CSV again for batches already exported (a lost file). Changes nothing; audited. */
+  async reexportCsv(input: {
+    batchIds: string[];
+    adminPhone: string;
+    reason: string;
+  }): Promise<string> {
+    const admin = await this.admin(input.adminPhone, input.reason);
+    const batches = await this.prisma.settlementBatch.findMany({
+      where: { id: { in: input.batchIds }, status: 'exported' },
+      orderBy: { businessDay: 'asc' },
+    });
+    for (const b of batches) {
+      await this.prisma.$transaction((tx) =>
+        this.audit(tx, admin, 'settlement.reexport', b, b, input.reason),
+      );
+    }
+    return this.csvFor(batches);
+  }
+
+  private async csvFor(batches: SettlementBatch[]): Promise<string> {
     const names = await this.profiles.payoutNames([...new Set(batches.map((b) => b.sellerId))]);
     const header = [
       'batch_id',
@@ -91,15 +124,6 @@ export class FinanceService {
         '',
       ];
     });
-    for (const before of batches) {
-      await this.prisma.$transaction(async (tx) => {
-        const after = await tx.settlementBatch.update({
-          where: { id: before.id, status: 'approved' },
-          data: { status: 'exported', exportedAt: new Date() },
-        });
-        await this.audit(tx, admin, 'settlement.export', before, after, input.reason);
-      });
-    }
     return [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n') + '\n';
   }
 

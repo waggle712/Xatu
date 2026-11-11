@@ -4,6 +4,7 @@ import { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { env } from '../../config/env.js';
 import { bullConnection, QUEUES } from '../../queue/queue.js';
+import { LedgerService } from './ledger.service.js';
 import { ReconciliationService } from './reconciliation.service.js';
 import { SettlementsService } from './settlements.service.js';
 
@@ -18,6 +19,7 @@ export class LedgerJobs implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly settlements: SettlementsService,
     private readonly reconciliation: ReconciliationService,
+    private readonly ledger: LedgerService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -34,10 +36,17 @@ export class LedgerJobs implements OnModuleInit, OnModuleDestroy {
       { pattern: '0 2 * * *', tz: 'Asia/Kolkata' },
       { name: 'reconciliation' },
     );
+    // Runs even without Razorpay keys: every captured payment, placed order and refund is posted.
+    await this.queue.upsertJobScheduler(
+      'completeness',
+      { pattern: '30 2 * * *', tz: 'Asia/Kolkata' },
+      { name: 'completeness' },
+    );
     this.worker = new Worker(
       QUEUES.ledgerNightly,
       async (job) => {
         if (job.name === 'settlements') return this.settlements.createBatches(new Date());
+        if (job.name === 'completeness') return this.ledger.backfill();
         // Yesterday's report (Razorpay settles about T+2; the T+3 check catches what's missing).
         if (job.name === 'reconciliation' && env.RAZORPAY_KEY_ID) {
           return this.reconciliation.reconcile(new Date(Date.now() - 86_400_000));
