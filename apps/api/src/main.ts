@@ -7,7 +7,8 @@ import { configureApp } from './app.setup.js';
 import { env } from './config/env.js';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: webhook signatures are checked over the exact bytes received.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY);
   configureApp(app);
   await app.listen(env.PORT);

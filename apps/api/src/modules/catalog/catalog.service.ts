@@ -600,6 +600,50 @@ export class CatalogService {
     });
   }
 
+  /**
+   * On a verified payment: lowers stock for the order's lines inside the caller's transaction.
+   * Locks the variant rows in id order. If the order's holds are still active they are used;
+   * if they lapsed (late payment) the lines must be covered by stock not held by anyone else.
+   * Returns false, changing nothing, when there isn't enough. Stock never goes negative.
+   */
+  async commitForOrder(
+    tx: Tx,
+    input: { orderId: string; lines: { variantId: string; quantity: number }[] },
+  ): Promise<boolean> {
+    const ids = [...new Set(input.lines.map((l) => l.variantId))].sort();
+    const locked = await tx.$queryRaw<{ id: string; stock: number }[]>`
+      SELECT id, stock FROM product_variants WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
+    const stockOf = new Map(locked.map((r) => [r.id, r.stock]));
+    const own = await tx.$queryRaw<{ variant_id: string; held: bigint }[]>`
+      SELECT variant_id, SUM(quantity)::bigint AS held FROM inventory_reservations
+      WHERE order_id = ${input.orderId}::uuid AND status = 'active' AND expires_at > now()
+      GROUP BY variant_id`;
+    const ownHeld = new Map(own.map((r) => [r.variant_id, Number(r.held)]));
+    const heldByAll = await heldUnits(tx, ids);
+    const need = new Map<string, number>();
+    for (const l of input.lines) need.set(l.variantId, (need.get(l.variantId) ?? 0) + l.quantity);
+
+    for (const [variantId, qty] of need) {
+      const stock = stockOf.get(variantId);
+      if (stock === undefined) return false;
+      // Units held by OTHER orders can't be sold to this one.
+      const heldByOthers = (heldByAll.get(variantId) ?? 0) - (ownHeld.get(variantId) ?? 0);
+      if (stock - heldByOthers < qty) return false;
+    }
+    for (const [variantId, qty] of need) {
+      const stockAfter = stockOf.get(variantId)! - qty;
+      await tx.productVariant.update({ where: { id: variantId }, data: { stock: stockAfter } });
+      await tx.stockMovement.create({
+        data: { variantId, delta: -qty, stockAfter, reason: 'order_sold', actorId: null },
+      });
+    }
+    await tx.inventoryReservation.updateMany({
+      where: { orderId: input.orderId, status: { in: ['active', 'expired'] } },
+      data: { status: 'committed' },
+    });
+    return true;
+  }
+
   /** Ends an order's active holds (cancelled → released, timed out → expired). */
   async releaseForOrder(tx: Tx, orderId: string, to: 'released' | 'expired'): Promise<void> {
     await tx.inventoryReservation.updateMany({

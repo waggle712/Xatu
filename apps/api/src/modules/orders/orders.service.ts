@@ -268,6 +268,83 @@ export class OrdersService {
     return this.get(buyerId, orderId);
   }
 
+  /**
+   * A payment for this order was verified (outbox `payment.verified`). Safe to run twice.
+   * Unpaid or expired order: lower stock (catalog, under row locks) and place it. If the stock is
+   * gone (late payment) or the order was closed meanwhile (cancelled), ask payments to refund
+   * (`order.refund_needed`). Never changes a payment itself.
+   */
+  async onPaymentVerified(input: { orderId: string; paymentId: string }): Promise<void> {
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ status: OrderStatus; placed_by: string | null }[]>`
+        SELECT o.status, (SELECT e.note FROM order_events e WHERE e.order_id = o.id AND e.to_status = 'placed' LIMIT 1) AS placed_by
+        FROM orders o WHERE o.id = ${input.orderId}::uuid FOR UPDATE`;
+      const row = rows[0];
+      if (!row) return 'missing' as const;
+      if (row.placed_by === input.paymentId) return 'already' as const;
+      if (row.status !== 'awaiting_payment' && row.status !== 'expired') {
+        await this.refundNeeded(
+          tx,
+          input,
+          row.status === 'placed' ? 'second_payment' : 'order_closed',
+        );
+        return 'refund' as const;
+      }
+      const items = await tx.orderItem.findMany({ where: { orderId: input.orderId } });
+      const ok = await this.catalog.commitForOrder(tx, {
+        orderId: input.orderId,
+        lines: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+      });
+      if (!ok) {
+        await this.refundNeeded(tx, input, 'out_of_stock');
+        return 'refund' as const;
+      }
+      await this.transition(
+        tx,
+        input.orderId,
+        row.status,
+        'placed',
+        'system',
+        null,
+        input.paymentId,
+      );
+      return 'placed' as const;
+    }, TX_OPTIONS);
+
+    if (outcome === 'placed') {
+      const order = await this.prisma.order.findUniqueOrThrow({ where: { id: input.orderId } });
+      this.analytics.capture(order.buyerId, 'order_paid', {
+        order_id: order.id,
+        seller_id: order.sellerId,
+        total_paise: paiseToNumber(order.totalPaise),
+        fulfilment_mode: order.fulfilmentMode,
+      });
+    }
+  }
+
+  private async refundNeeded(
+    tx: Tx,
+    input: { orderId: string; paymentId: string },
+    reason: 'out_of_stock' | 'order_closed' | 'second_payment',
+  ): Promise<void> {
+    await tx.outboxEvent.create({
+      data: {
+        topic: 'order.refund_needed',
+        aggregateId: input.orderId,
+        payload: { ...input, reason },
+      },
+    });
+  }
+
+  /** For payments: an order's current status, or null. */
+  async statusOf(orderId: string): Promise<OrderStatus | null> {
+    const row = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+    return row?.status ?? null;
+  }
+
   /** Expires unpaid orders whose hold time is over. Safe to run any number of times. */
   async expireDue(limit = 200): Promise<number> {
     const due = await this.prisma.order.findMany({
@@ -303,6 +380,7 @@ export class OrdersService {
     to: OrderStatus,
     actor: OrderActor,
     actorId: string | null,
+    note?: string,
   ): Promise<void> {
     if (!canTransitionOrder(from, to, actor)) throw invalidStatus();
     const { count } = await tx.order.updateMany({
@@ -310,7 +388,16 @@ export class OrdersService {
       data: { status: to, ...(to === 'awaiting_payment' ? {} : { expiresAt: null }) },
     });
     if (count !== 1) throw invalidStatus();
-    await this.recordChange(tx, orderId, from, to, actorId, `order.${to}`, { from, to, actor });
+    await this.recordChange(
+      tx,
+      orderId,
+      from,
+      to,
+      actorId,
+      `order.${to}`,
+      { from, to, actor },
+      note,
+    );
   }
 
   private async recordChange(
@@ -321,8 +408,11 @@ export class OrdersService {
     actorId: string | null,
     topic: string,
     payload: Prisma.InputJsonObject,
+    note?: string,
   ): Promise<void> {
-    await tx.orderEvent.create({ data: { orderId, fromStatus: from, toStatus: to, actorId } });
+    await tx.orderEvent.create({
+      data: { orderId, fromStatus: from, toStatus: to, actorId, note: note ?? null },
+    });
     await tx.outboxEvent.create({
       data: { topic, aggregateId: orderId, payload: { orderId, ...payload } },
     });

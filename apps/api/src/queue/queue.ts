@@ -10,4 +10,7 @@ export const QUEUES = {
   media: 'media',
   mediaDeadLetter: 'media-dead-letter',
   ordersExpiry: 'orders-expiry',
+  outboxRelay: 'outbox-relay',
+  razorpayWebhooks: 'razorpay-webhooks',
+  paymentsPoller: 'payments-poller',
 } as const;

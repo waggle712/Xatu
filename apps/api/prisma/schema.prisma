@@ -684,6 +684,10 @@ model Payment {
   currency          String        @default("INR")
   failureReason     String?       @map("failure_reason")
   verifiedAt        DateTime?     @map("verified_at")
+  /// How it was verified: 'webhook' or 'fetch' (never the app).
+  verifiedBy        String?       @map("verified_by")
+  /// Last server-side fetch from Razorpay (the poller and on-demand checks).
+  lastCheckedAt     DateTime?     @map("last_checked_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
@@ -702,13 +706,20 @@ model PaymentWebhookEvent {
   providerEventId String    @map("provider_event_id")
   eventType       String    @map("event_type")
   payload         Json
+  /// The exact bytes received, so the signature can be checked again later.
+  rawBody         String    @map("raw_body")
+  signature       String?
   signatureValid  Boolean   @map("signature_valid")
+  attempts        Int       @default(0)
   processedAt     DateTime? @map("processed_at")
   outcome         String?
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  @@unique([provider, providerEventId])
+  // Unique per provider event id among VALID events only (partial index in the migration), so
+  // a forged request can never take a real event's id first.
+  @@index([provider, providerEventId])
+  @@index([processedAt, createdAt])
   @@map("payment_webhook_events")
 }
 
