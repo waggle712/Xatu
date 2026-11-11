@@ -1,0 +1,31 @@
+{
+  "entity": "event",
+  "account_id": "acc_TestAccount00001",
+  "event": "payment.failed",
+  "contains": ["payment"],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "__PAYMENT_ID__",
+        "entity": "payment",
+        "amount": "__AMOUNT__",
+        "currency": "INR",
+        "status": "failed",
+        "order_id": "__ORDER_ID__",
+        "international": false,
+        "method": "upi",
+        "amount_refunded": 0,
+        "captured": false,
+        "vpa": "failure@razorpay",
+        "notes": { "order_id": "__XATU_ORDER_ID__" },
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "Payment was unsuccessful as the UPI app did not respond.",
+        "error_source": "customer",
+        "error_step": "payment_authorization",
+        "error_reason": "payment_failed",
+        "created_at": "__CREATED_AT__"
+      }
+    }
+  },
+  "created_at": "__CREATED_AT__"
+}

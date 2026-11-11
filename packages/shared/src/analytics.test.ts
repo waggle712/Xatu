@@ -28,6 +28,7 @@ describe('analytics events', () => {
         'order_created',
         'order_failed',
         'order_cancelled',
+        'payment_started',
       ].sort(),
     );
   });

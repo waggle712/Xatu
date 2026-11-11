@@ -93,6 +93,8 @@ export const analyticsEvents = {
       'other',
     ]),
   }),
+  /** The buyer tapped Pay and Razorpay Checkout opened. Fired by the app (never means paid). */
+  payment_started: z.strictObject({ order_id: id }),
   /** A buyer cancelled an unpaid order. Fired by the API. */
   order_cancelled: z.strictObject({ order_id: id, by: z.enum(['buyer', 'seller', 'system']) }),
   /** A buyer saved a product (heart). */

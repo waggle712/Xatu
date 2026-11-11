@@ -51,6 +51,9 @@ const KNOWN_CODES = [
   'order_not_found',
   'idempotency_in_progress',
   'too_many_unpaid_orders',
+  'payments_unavailable',
+  'already_paid',
+  'payment_not_found',
 ] as const;
 
 /** Any error → a short message in the person's language. Never shows raw server text. */

@@ -70,6 +70,12 @@ const envSchema = z.object({
     .pipe(z.array(z.string().regex(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/, 'Bad SHA-256 fingerprint'))),
   /** App Store page for the preview page's download button. Empty = no App Store button. */
   APP_STORE_URL: z.union([z.string().url(), z.literal('')]).default(''),
+  /** Razorpay TEST-mode keys. Empty = payments switched off (503 payments_unavailable). */
+  RAZORPAY_KEY_ID: z.string().default(''),
+  RAZORPAY_KEY_SECRET: z.string().default(''),
+  /** Webhook secret from Dashboard → Webhooks. Empty = webhooks refused with 503. */
+  RAZORPAY_WEBHOOK_SECRET: z.string().default(''),
+  RAZORPAY_API_URL: z.string().url().default('https://api.razorpay.com'),
   AUTH_DEV_BYPASS: z
     .enum(['true', 'false'])
     .default('false')
@@ -101,6 +107,20 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   }
   if (d.MEDIA_STORAGE === 'local' && d.NODE_ENV === 'production') {
     throw new Error('Invalid environment: MEDIA_STORAGE=local is for development only');
+  }
+  // No real money until the pre-launch tests (prompt 22) pass and the lawyer and CA sign off.
+  if (d.RAZORPAY_KEY_ID.startsWith('rzp_live_')) {
+    throw new Error(
+      'Invalid environment: live Razorpay keys are refused until launch sign-off (test mode only)',
+    );
+  }
+  if (d.RAZORPAY_KEY_ID && !d.RAZORPAY_KEY_ID.startsWith('rzp_test_')) {
+    throw new Error('Invalid environment: RAZORPAY_KEY_ID must be a test key (rzp_test_...)');
+  }
+  if (!!d.RAZORPAY_KEY_ID !== !!d.RAZORPAY_KEY_SECRET) {
+    throw new Error(
+      'Invalid environment: set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither',
+    );
   }
   if (parsed.data.AUTH_DEV_BYPASS && parsed.data.NODE_ENV === 'production') {
     throw new Error('Invalid environment: AUTH_DEV_BYPASS must never be enabled in production');

@@ -33,6 +33,10 @@ export async function setup(): Promise<void> {
     PUBLIC_API_URL: 'http://media.test',
     RUN_WORKERS: 'true',
     PUBLIC_WEB_URL: 'https://links.test',
+    // Fake test-mode values: the tests replace the Razorpay client with a fake; nothing leaves.
+    RAZORPAY_KEY_ID: 'rzp_test_FakeKeyForTests',
+    RAZORPAY_KEY_SECRET: 'fake-test-secret',
+    RAZORPAY_WEBHOOK_SECRET: 'fake-webhook-secret-for-tests',
     APPLE_TEAM_ID: 'TEAMID1234',
     ANDROID_CERT_SHA256:
       'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99',

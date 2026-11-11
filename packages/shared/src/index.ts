@@ -9,3 +9,4 @@ export * from './catalog.ts';
 export * from './discovery.ts';
 export * from './social.ts';
 export * from './orders.ts';
+export * from './payments.ts';

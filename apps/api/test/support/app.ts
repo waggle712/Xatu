@@ -7,6 +7,8 @@ import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { RATE_LIMIT_KEY_PREFIX } from '../../src/common/rate-limit.js';
 import { REDIS } from '../../src/redis/redis.module.js';
+import { RAZORPAY_CLIENT } from '../../src/modules/payments/razorpay.client.js';
+import { FakeRazorpay } from './razorpay.js';
 import {
   FirebaseVerifier,
   InvalidFirebaseTokenError,
@@ -29,7 +31,12 @@ export interface RecordedEvent {
 }
 
 /** Boots the real app against the Testcontainers database, with Firebase and analytics faked. */
-export async function createTestApp(): Promise<{ app: INestApplication; events: RecordedEvent[] }> {
+export async function createTestApp(): Promise<{
+  app: INestApplication;
+  events: RecordedEvent[];
+  razorpay: FakeRazorpay;
+}> {
+  const razorpay = new FakeRazorpay();
   const events: RecordedEvent[] = [];
   const analytics: AnalyticsClient = {
     capture: (e) => void events.push(e),
@@ -40,11 +47,13 @@ export async function createTestApp(): Promise<{ app: INestApplication; events: 
     .useClass(FakeFirebaseVerifier)
     .overrideProvider(ANALYTICS_CLIENT)
     .useValue(analytics)
+    .overrideProvider(RAZORPAY_CLIENT)
+    .useValue(razorpay)
     .compile();
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication({ rawBody: true });
   configureApp(app);
   await app.init();
-  return { app, events };
+  return { app, events, razorpay };
 }
 
 /** Clears rate-limit counters, since every test request comes from the same IP. */

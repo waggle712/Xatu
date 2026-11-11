@@ -1,0 +1,38 @@
+{
+  "entity": "event",
+  "account_id": "acc_TestAccount00001",
+  "event": "order.paid",
+  "contains": ["payment", "order"],
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "__PAYMENT_ID__",
+        "entity": "payment",
+        "amount": "__AMOUNT__",
+        "currency": "INR",
+        "status": "captured",
+        "order_id": "__ORDER_ID__",
+        "method": "upi",
+        "captured": true,
+        "notes": { "order_id": "__XATU_ORDER_ID__" },
+        "created_at": "__CREATED_AT__"
+      }
+    },
+    "order": {
+      "entity": {
+        "id": "__ORDER_ID__",
+        "entity": "order",
+        "amount": "__AMOUNT__",
+        "amount_paid": "__AMOUNT__",
+        "amount_due": 0,
+        "currency": "INR",
+        "receipt": "XT-TEST01",
+        "status": "paid",
+        "attempts": 1,
+        "notes": { "order_id": "__XATU_ORDER_ID__" },
+        "created_at": "__CREATED_AT__"
+      }
+    }
+  },
+  "created_at": "__CREATED_AT__"
+}

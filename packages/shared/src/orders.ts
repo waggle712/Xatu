@@ -53,6 +53,8 @@ const T: Partial<Record<OrderStatus, Partial<Record<OrderStatus, OrderActor[]>>>
   ready_for_pickup: { completed: ['seller', 'system'], in_dispute: ['buyer', 'admin'] },
   out_for_delivery: { completed: ['seller', 'system'], in_dispute: ['buyer', 'admin'] },
   completed: { in_dispute: ['buyer', 'admin'] },
+  // A late payment (captured after the hold ran out) places the order if stock is still there.
+  expired: { placed: ['system'] },
   in_dispute: {
     refunded: ['admin'],
     partially_refunded: ['admin'],

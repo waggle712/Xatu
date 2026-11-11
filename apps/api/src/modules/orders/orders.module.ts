@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, type OnModuleInit } from '@nestjs/common';
+import { OutboxRelay } from '../../outbox/outbox.relay.js';
 import { IdempotencyInterceptor } from '../../common/idempotency.js';
 import { RateLimitGuard } from '../../common/rate-limit.js';
 import { CatalogModule } from '../catalog/catalog.module.js';
@@ -20,4 +21,15 @@ import { OrdersService } from './orders.service.js';
   providers: [CartService, OrdersService, OrdersExpiry, RateLimitGuard, IdempotencyInterceptor],
   exports: [OrdersService],
 })
-export class OrdersModule {}
+export class OrdersModule implements OnModuleInit {
+  constructor(
+    private readonly relay: OutboxRelay,
+    private readonly orders: OrdersService,
+  ) {}
+
+  onModuleInit(): void {
+    this.relay.on('payment.verified', (m) =>
+      this.orders.onPaymentVerified(m.payload as { orderId: string; paymentId: string }),
+    );
+  }
+}

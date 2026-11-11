@@ -9,11 +9,13 @@ import { Screen } from '../../src/components/Screen';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { useCancelOrder, useOrder } from '../../src/features/orders/api';
 import { MoneyRow, OrderStatusPill } from '../../src/features/orders/parts';
+import { useOrderPayment } from '../../src/features/payments/api';
+import { PayPanel } from '../../src/features/payments/PayPanel';
 import { ApiRequestError } from '../../src/lib/api';
 import { errorMessage } from '../../src/lib/errors';
 import { useSession } from '../../src/store/session';
 
-/** One order. Payment arrives in prompt 15; until then an unpaid order waits 15 minutes. */
+/** One order. An unpaid order waits 15 minutes for payment (Razorpay, test mode). */
 export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
@@ -43,6 +45,7 @@ function OrderDetails({ order }: { order: OrderView }) {
   const theme = useTheme();
   const language = useSession((s) => s.language);
   const cancel = useCancelOrder(order.id);
+  const payment = useOrderPayment(order.id);
   const until = order.expiresAt
     ? new Date(order.expiresAt).toLocaleTimeString(language === 'ta' ? 'ta-IN' : 'en-IN', {
         hour: 'numeric',
@@ -73,7 +76,25 @@ function OrderDetails({ order }: { order: OrderView }) {
           </View>
         </View>
       ) : null}
-      {order.status === 'expired' ? <Text color="inkMuted">{t('order.expiredBody')}</Text> : null}
+      {payment.data?.status === 'refund_pending' || payment.data?.status === 'refunded' ? (
+        <View
+          style={{
+            padding: theme.space[4],
+            borderRadius: theme.radius.md,
+            backgroundColor: theme.colors.surfaceWarm,
+            gap: theme.space[1],
+          }}
+        >
+          <Text variant="label">
+            {t(payment.data.status === 'refunded' ? 'pay.refundedTitle' : 'pay.refundTitle')}
+          </Text>
+          <Text variant="caption" color="inkMuted">
+            {t('pay.refundBody')}
+          </Text>
+        </View>
+      ) : order.status === 'expired' ? (
+        <Text color="inkMuted">{t('order.expiredBody')}</Text>
+      ) : null}
 
       <Pressable
         accessibilityRole="link"
@@ -127,6 +148,7 @@ function OrderDetails({ order }: { order: OrderView }) {
         </View>
       ) : null}
 
+      {order.status === 'awaiting_payment' ? <PayPanel order={order} /> : null}
       {order.status === 'awaiting_payment' ? (
         <Button
           variant="secondary"
