@@ -11,7 +11,8 @@ export function BackButton() {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={t('a11y.back')}
-      onPress={() => router.back()}
+      // A page opened from a shared link may be the only screen; go home instead of nowhere.
+      onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
       hitSlop={8}
       style={{ width: 48, height: 48, justifyContent: 'center', marginLeft: -12 }}
     >

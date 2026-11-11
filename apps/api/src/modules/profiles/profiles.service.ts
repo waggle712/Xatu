@@ -4,7 +4,9 @@ import {
   canTransitionSeller,
   type Category,
   type CreateShopRequest,
+  type FollowedShop,
   type FulfilmentMode,
+  MAX_FOLLOWED_SHOPS,
   missingForSubmit,
   type MyShop,
   type OpeningHours,
@@ -192,12 +194,13 @@ export class ProfilesService {
     if (!shop || !PUBLIC_SELLER_STATUSES.includes(shop.status)) {
       throw new AppError('shop_not_found', 'This shop is not available.', HttpStatus.NOT_FOUND);
     }
-    const [point, liveProductCount, completedOrderCount] = await Promise.all([
+    const [point, liveProductCount, completedOrderCount, followerCount] = await Promise.all([
       this.readLocation(shop.id),
       this.prisma.product.count({
         where: { sellerId: shop.id, status: 'active', moderationStatus: 'live' },
       }),
       this.prisma.order.count({ where: { sellerId: shop.id, status: 'delivered' } }),
+      this.prisma.shopFollow.count({ where: { sellerId: shop.id } }),
     ]);
     return {
       handle: shop.handle,
@@ -216,6 +219,7 @@ export class ProfilesService {
       verified: shop.verificationStatus === 'verified',
       liveProductCount,
       completedOrderCount,
+      followerCount,
     };
   }
 
@@ -261,6 +265,103 @@ export class ProfilesService {
       select: { id: true, status: true },
     });
     return shop && PUBLIC_SELLER_STATUSES.includes(shop.status) ? shop.id : null;
+  }
+
+  // ───────────────────────────── Following ─────────────────────────────
+
+  /** Follows a public shop by handle. Safe to repeat. You can't follow your own shop. */
+  async follow(userId: string, handle: string): Promise<void> {
+    const shop = await this.prisma.sellerProfile.findUnique({
+      where: { handle },
+      select: { id: true, userId: true, status: true },
+    });
+    if (!shop || !PUBLIC_SELLER_STATUSES.includes(shop.status)) {
+      throw new AppError('shop_not_found', 'This shop is not available.', HttpStatus.NOT_FOUND);
+    }
+    if (shop.userId === userId) {
+      throw new AppError(
+        'cannot_follow_own_shop',
+        "You can't follow your own shop.",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const existing = await this.prisma.shopFollow.findUnique({
+      where: { userId_sellerId: { userId, sellerId: shop.id } },
+    });
+    if (existing) return;
+    if ((await this.prisma.shopFollow.count({ where: { userId } })) >= MAX_FOLLOWED_SHOPS) {
+      throw new AppError(
+        'following_list_full',
+        `You can follow up to ${MAX_FOLLOWED_SHOPS} shops. Unfollow some to follow more.`,
+        HttpStatus.CONFLICT,
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.shopFollow.createMany({
+        data: { userId, sellerId: shop.id },
+        skipDuplicates: true,
+      });
+      if (count === 1) {
+        await this.outbox(tx, 'shop.followed', shop.id, { sellerId: shop.id, userId });
+      }
+    });
+  }
+
+  async unfollow(userId: string, handle: string): Promise<void> {
+    await this.prisma.shopFollow.deleteMany({ where: { userId, seller: { handle } } });
+  }
+
+  /** Handles of public shops the buyer follows. */
+  async followedHandles(userId: string): Promise<string[]> {
+    const rows = await this.prisma.shopFollow.findMany({
+      where: { userId, seller: { status: { in: [...PUBLIC_SELLER_STATUSES] } } },
+      select: { seller: { select: { handle: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_FOLLOWED_SHOPS,
+    });
+    return rows.map((r) => r.seller.handle);
+  }
+
+  /** The buyer's Following list, newest first. Public fields only. */
+  async listFollowing(
+    userId: string,
+    cursor: string | undefined,
+  ): Promise<{ items: FollowedShop[]; nextCursor: string | null }> {
+    const after = cursor === undefined ? null : decodeFollowCursor(cursor);
+    const rows = await this.prisma.shopFollow.findMany({
+      where: {
+        userId,
+        seller: { status: { in: [...PUBLIC_SELLER_STATUSES] } },
+        ...(after
+          ? {
+              OR: [
+                { createdAt: { lt: after.createdAt } },
+                { createdAt: after.createdAt, sellerId: { lt: after.sellerId } },
+              ],
+            }
+          : {}),
+      },
+      include: { seller: { include: { coverMedia: true } } },
+      orderBy: [{ createdAt: 'desc' }, { sellerId: 'desc' }],
+      take: FOLLOW_PAGE_SIZE + 1,
+    });
+    const page = rows.slice(0, FOLLOW_PAGE_SIZE);
+    const last = page[page.length - 1];
+    return {
+      items: page.map(({ seller }) => ({
+        handle: seller.handle,
+        businessName: seller.businessName,
+        verified: seller.verificationStatus === 'verified',
+        areaName: seller.areaName,
+        city: seller.city,
+        cover: this.media.toImage(seller.coverMedia),
+        acceptingOrders: seller.status === 'active',
+      })),
+      nextCursor:
+        rows.length > FOLLOW_PAGE_SIZE && last
+          ? Buffer.from(`${last.createdAt.toISOString()}|${last.sellerId}`).toString('base64url')
+          : null,
+    };
   }
 
   private async transition(userId: string, shop: SellerProfile, to: SellerStatus): Promise<MyShop> {
@@ -368,6 +469,18 @@ export interface PublicSellerSummary {
   city: string;
   acceptingOrders: boolean;
   offeredModes: FulfilmentMode[];
+}
+
+const FOLLOW_PAGE_SIZE = 30;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function decodeFollowCursor(cursor: string): { createdAt: Date; sellerId: string } {
+  const [iso, sellerId] = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
+  const createdAt = new Date(iso ?? '');
+  if (Number.isNaN(createdAt.getTime()) || !sellerId || !UUID.test(sellerId)) {
+    throw new AppError('invalid_cursor', 'This page link is not valid.', HttpStatus.BAD_REQUEST);
+  }
+  return { createdAt, sellerId };
 }
 
 function offeredModes(shop: SellerProfile): FulfilmentMode[] {

@@ -9,8 +9,10 @@ import {
   type ProductDraft,
   type ProductPage,
   type ProductStatus,
+  MAX_SAVED_PRODUCTS,
   type PublicProduct,
   publishProblems,
+  type SavedProductCard,
   type SellerProduct,
   type SellerProductCard,
   type VariantAttributes,
@@ -317,6 +319,126 @@ export class CatalogService {
       items: page.map((row) => ({ ...this.card(row, images), title: row.title! })),
       nextCursor: rows.length > PAGE_SIZE ? encodeCursor(page[page.length - 1]!) : null,
     };
+  }
+
+  // ───────────────────────────── Saved products (heart) ─────────────────────────────
+
+  /**
+   * Saves a product for a buyer. Safe to repeat. Only products buyers can see can be newly
+   * saved; a product already saved stays a quiet no-op even if it has since been hidden.
+   */
+  async save(userId: string, productId: string): Promise<void> {
+    const existing = await this.prisma.savedProduct.findUnique({
+      where: { userId_productId: { userId, productId } },
+    });
+    if (existing) return;
+    if (!(await this.publicProductSellerId(productId))) {
+      throw new AppError(
+        'product_not_found',
+        'This product is not available.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if ((await this.prisma.savedProduct.count({ where: { userId } })) >= MAX_SAVED_PRODUCTS) {
+      throw new AppError(
+        'saved_list_full',
+        `You can save up to ${MAX_SAVED_PRODUCTS} products. Remove some to save more.`,
+        HttpStatus.CONFLICT,
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      // ON CONFLICT DO NOTHING: a parallel save of the same product writes one row and one event.
+      const { count } = await tx.savedProduct.createMany({
+        data: { userId, productId },
+        skipDuplicates: true,
+      });
+      if (count === 1) await this.outbox(tx, 'product.saved', productId, { productId, userId });
+    });
+  }
+
+  async unsave(userId: string, productId: string): Promise<void> {
+    await this.prisma.savedProduct.deleteMany({ where: { userId, productId } });
+  }
+
+  /** Ids of every product the buyer saved (hidden ones too, so hearts stay right). */
+  async savedProductIds(userId: string): Promise<string[]> {
+    const rows = await this.prisma.savedProduct.findMany({
+      where: { userId },
+      select: { productId: true },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_SAVED_PRODUCTS,
+    });
+    return rows.map((r) => r.productId);
+  }
+
+  /** The buyer's Saved list, newest first: only products buyers can still see. */
+  async listSaved(
+    userId: string,
+    cursor: string | undefined,
+  ): Promise<ProductPage<SavedProductCard>> {
+    const after = cursor === undefined ? null : decodeSavedCursor(cursor);
+    const saved = await this.prisma.savedProduct.findMany({
+      where: {
+        userId,
+        product: {
+          status: 'active',
+          moderationStatus: 'live',
+          title: { not: null },
+          variants: { some: { deletedAt: null } },
+        },
+        ...(after
+          ? {
+              OR: [
+                { createdAt: { lt: after.createdAt } },
+                { createdAt: after.createdAt, productId: { lt: after.productId } },
+              ],
+            }
+          : {}),
+      },
+      include: { product: { include: withChildren } },
+      orderBy: [{ createdAt: 'desc' }, { productId: 'desc' }],
+      take: PAGE_SIZE + 1,
+    });
+    const page = saved.slice(0, PAGE_SIZE);
+    const [makers, images] = await Promise.all([
+      this.profiles.publicSellers([...new Set(page.map((s) => s.product.sellerId))]),
+      this.media.imagesFor(page.flatMap((s) => s.product.media.map((m) => m.mediaId))),
+    ]);
+    const items: SavedProductCard[] = [];
+    for (const { product } of page) {
+      const maker = makers.get(product.sellerId);
+      if (!maker) continue; // the shop is no longer public
+      items.push({
+        ...this.card(product, images),
+        title: product.title!,
+        maker: { handle: maker.handle, businessName: maker.businessName, verified: maker.verified },
+      });
+    }
+    const last = page[page.length - 1];
+    return {
+      items,
+      nextCursor: saved.length > PAGE_SIZE && last ? encodeSavedCursor(last) : null,
+    };
+  }
+
+  /**
+   * The seller id of a product buyers can see right now, or null. Used by trust (reports) so it
+   * never reads the products table itself.
+   */
+  async publicProductSellerId(productId: string): Promise<string | null> {
+    const row = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        sellerId: true,
+        status: true,
+        moderationStatus: true,
+        title: true,
+        _count: { select: { variants: { where: { deletedAt: null } } } },
+      },
+    });
+    if (!row || !isProductPublic(row) || !row.title || row._count.variants === 0) return null;
+    const maker = (await this.profiles.publicSellers([row.sellerId])).get(row.sellerId);
+    return maker ? row.sellerId : null;
   }
 
   // ───────────────────────────── Internals ─────────────────────────────
@@ -712,6 +834,15 @@ function toVariantView(v: ProductVariant) {
     pricePaise: paiseToNumber(v.pricePaise),
     stock: v.stock,
   };
+}
+
+function encodeSavedCursor(row: { createdAt: Date; productId: string }): string {
+  return Buffer.from(`${row.createdAt.toISOString()}|${row.productId}`).toString('base64url');
+}
+
+function decodeSavedCursor(cursor: string): { createdAt: Date; productId: string } {
+  const { publishedAt, id } = decodeCursor(cursor);
+  return { createdAt: publishedAt, productId: id };
 }
 
 function encodeCursor(row: Product): string {

@@ -32,6 +32,10 @@ export async function setup(): Promise<void> {
     MEDIA_LOCAL_DIR: mkdtempSync(join(tmpdir(), 'xatu-media-')),
     PUBLIC_API_URL: 'http://media.test',
     RUN_WORKERS: 'true',
+    PUBLIC_WEB_URL: 'https://links.test',
+    APPLE_TEAM_ID: 'TEAMID1234',
+    ANDROID_CERT_SHA256:
+      'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99',
   });
 
   execSync('npx prisma migrate deploy', { stdio: 'inherit', env: process.env });

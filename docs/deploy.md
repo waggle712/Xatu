@@ -179,6 +179,16 @@ Photos go straight from the phone to a **private R2 bucket** using a signed, 15-
 
 **Worker container.** Media processing runs in BullMQ jobs. Run a second ECS service from the same image with command `node dist/src/worker.js` and `RUN_WORKERS=true`; set `RUN_WORKERS=false` on the API service. The worker needs the same secrets (database, Redis, R2) and no load balancer. Failed jobs are retried 5 times with exponential backoff, then moved to the `media-dead-letter` queue, the photo is marked `rejected` (`processing_failed`) and a Sentry alert is raised. Replay a dead-lettered job only after fixing the cause.
 
+## Share links (universal links and App Links)
+
+Share links look like `https://<web domain>/p/<product id>` and `/s/<shop handle>`. The API serves both the preview pages and the link files, so point the web domain (or just its `/p/*`, `/s/*` and `/.well-known/*` paths) at the API service. No redirects on `/.well-known/`: iOS and Android refuse them.
+
+1. API settings: `PUBLIC_WEB_URL=https://<web domain>`, `APPLE_TEAM_ID` (Apple Developer > Membership), `ANDROID_CERT_SHA256` (Play Console > App integrity > App signing key certificate, SHA-256; add the upload key too, comma separated, if testers install builds signed with it), optional `APP_STORE_URL`.
+2. App build: `EXPO_PUBLIC_WEB_URL=https://<web domain>` in the EAS build profile. It adds `applinks:<domain>` (iOS) and verified intent filters for `/p/` and `/s/` (Android), so a new native build is needed.
+3. Check: `curl -i https://<web domain>/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` return `200` with `application/json`; then Google's Statement List tester and, on a phone, tap a link in WhatsApp.
+
+Until this is done, links open the web preview page, which has an "Open in app" button.
+
 ## Rollback
 
 - **Bad image:** run `update-express-gateway-service` again with the **previous tag** (images are immutable, so the old tag is exactly what ran before). Because migrations are expand-only, the old image works against the current database.

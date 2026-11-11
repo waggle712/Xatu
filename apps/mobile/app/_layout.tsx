@@ -12,12 +12,13 @@ import {
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { ThemeProvider, useTheme } from '@xatu/ui';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setupOnlineManager } from '../src/lib/network';
+import { takePendingLink } from '../src/lib/pendingLink';
 import {
   cacheBuster,
   PERSIST_MAX_AGE,
@@ -78,6 +79,15 @@ function RootLayout() {
 
 function RootStack({ signedIn }: { signedIn: boolean }) {
   const theme = useTheme();
+  // A shared link opened while signed out opens right after sign-in.
+  const wasSignedIn = useRef(signedIn);
+  useEffect(() => {
+    if (signedIn && !wasSignedIn.current) {
+      const link = takePendingLink();
+      if (link) setTimeout(() => router.push(link as never), 0);
+    }
+    wasSignedIn.current = signedIn;
+  }, [signedIn]);
   return (
     <>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
@@ -92,6 +102,9 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
           <Stack.Screen name="shop" />
           <Stack.Screen name="s/[handle]" />
           <Stack.Screen name="p/[id]" />
+          <Stack.Screen name="saved" />
+          <Stack.Screen name="following" />
+          <Stack.Screen name="report" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />

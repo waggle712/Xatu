@@ -1,9 +1,9 @@
 import { type PublicShop, WEEKDAYS } from '@xatu/shared';
 import { NearMeIcon, PickupSlotIcon, Text, TrustBadge, useTheme } from '@xatu/ui';
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackButton } from '../../src/components/BackButton';
 import { HexAvatar } from '../../src/components/HexAvatar';
@@ -11,8 +11,10 @@ import { XImage } from '../../src/components/XImage';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { ShopProductGrid } from '../../src/features/catalog/ProductLists';
 import { usePublicShop } from '../../src/features/shop/api';
-import { useFeatureFlag } from '../../src/lib/analytics';
+import { FollowButton, ReportLink, ShareButton } from '../../src/features/social/SocialButtons';
+import { track, useFeatureFlag } from '../../src/lib/analytics';
 import { errorMessage } from '../../src/lib/errors';
+import { consumeLink } from '../../src/lib/pendingLink';
 import { useSession } from '../../src/store/session';
 
 export default function PublicShopScreen() {
@@ -20,6 +22,10 @@ export default function PublicShopScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const query = usePublicShop(handle);
+  useEffect(() => {
+    const link = consumeLink(`/s/${handle}`);
+    if (link) track('share_link_opened', { target_type: 'shop', signed_in: !link.afterSignIn });
+  }, [handle]);
 
   return (
     <SafeAreaView
@@ -37,6 +43,15 @@ export default function PublicShopScreen() {
           <Text variant="heading" numberOfLines={1} style={{ flex: 1 }}>
             {handle}
           </Text>
+          {query.data ? (
+            <ShareButton
+              subject={{
+                type: 'shop',
+                handle: query.data.handle,
+                businessName: query.data.businessName,
+              }}
+            />
+          ) : null}
         </View>
         <OfflineBanner />
         {query.isPending ? (
@@ -72,12 +87,23 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
       {shop.cover ? (
         <XImage image={shop.cover} aspectRatio={16 / 9} accessibilityLabel={shop.businessName} />
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[4] }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: theme.space[4],
+        }}
+      >
         <HexAvatar name={shop.businessName} />
-        <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around' }}>
-          <Stat value={shop.liveProductCount} label={t('shop.public.products')} />
-          <Stat value={shop.completedOrderCount} label={t('shop.public.completed')} />
-        </View>
+        <FollowButton handle={shop.handle} businessName={shop.businessName} />
+      </View>
+      {/* Full width so Tamil labels get room and never break inside a word. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.space[3] }}>
+        <Stat value={shop.liveProductCount} label={t('shop.public.products')} />
+        <Stat value={shop.followerCount} label={t('social.followers')} />
+        <Stat value={shop.completedOrderCount} label={t('shop.public.completed')} />
       </View>
 
       <View style={{ gap: theme.space[2] }}>
@@ -178,19 +204,27 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
       ) : (
         <EmptyState title={t('shop.public.noReviews')} body={t('shop.public.noReviewsBody')} />
       )}
+      <ReportLink target={{ type: 'shop', handle: shop.handle }} />
     </View>
   );
 }
 
 function Stat({ value, label }: { value: number; label: string }) {
+  // At large text sizes three columns would split Tamil words; give each stat its own row.
+  const stacked = useWindowDimensions().fontScale > 1.3;
   return (
     <View
-      style={{ alignItems: 'center', flexShrink: 1 }}
+      style={{ flexGrow: 1, flexBasis: stacked ? '100%' : '33%', alignItems: 'center' }}
       accessible
       accessibilityLabel={`${value} ${label}`}
     >
       <Text variant="price">{String(value)}</Text>
-      <Text variant="caption" color="inkMuted" style={{ textAlign: 'center' }}>
+      <Text
+        variant="caption"
+        color="inkMuted"
+        maxFontSizeMultiplier={2}
+        style={{ textAlign: 'center' }}
+      >
         {label}
       </Text>
     </View>

@@ -19,15 +19,17 @@ import { HexAvatar } from '../../src/components/HexAvatar';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { XImage } from '../../src/components/XImage';
 import { usePublicProduct } from '../../src/features/catalog/api';
+import { ReportLink, SaveButton, ShareButton } from '../../src/features/social/SocialButtons';
 import { track, useFeatureFlag } from '../../src/lib/analytics';
 import { ApiRequestError } from '../../src/lib/api';
 import { errorMessage } from '../../src/lib/errors';
+import { consumeLink } from '../../src/lib/pendingLink';
 import { useSession } from '../../src/store/session';
 
 /**
- * Product page (Product design). Not in this prompt: buying (prompt 14), delivery fees, reviews
- * and trust score (prompt 19), share and save (prompt 13). No "money held" copy until Protected
- * Pay is confirmed with Razorpay and a lawyer.
+ * Product page (Product design), with save, share and report (behind `social`). Not here yet:
+ * buying (prompt 14), delivery fees, reviews and trust score (prompt 19). No "money held" copy
+ * until Protected Pay is confirmed with Razorpay and a lawyer.
  */
 export default function ProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,6 +38,10 @@ export default function ProductScreen() {
   const enabled = useFeatureFlag('catalog');
   const query = usePublicProduct(id);
   const gone = query.error instanceof ApiRequestError && query.error.status === 404;
+  useEffect(() => {
+    const link = consumeLink(`/p/${id}`);
+    if (link) track('share_link_opened', { target_type: 'product', signed_in: !link.afterSignIn });
+  }, [id]);
 
   return (
     <SafeAreaView
@@ -114,18 +120,30 @@ function ProductDetails({ product }: { product: PublicProduct }) {
       <Gallery product={product} title={title} />
       <View style={{ paddingHorizontal: theme.space[4], gap: theme.space[4] }}>
         <View style={{ gap: theme.space[2] }}>
-          <View
-            style={{
-              alignSelf: 'flex-start',
-              paddingHorizontal: theme.space[3],
-              paddingVertical: theme.space[1],
-              borderRadius: theme.radius.pill,
-              backgroundColor: theme.colors.blush,
-            }}
-          >
-            <Text variant="caption">
-              {t('catalog.page.handmadeIn', { city: product.maker.city })}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
+            <View style={{ flex: 1, alignItems: 'flex-start' }}>
+              <View
+                style={{
+                  paddingHorizontal: theme.space[3],
+                  paddingVertical: theme.space[1],
+                  borderRadius: theme.radius.pill,
+                  backgroundColor: theme.colors.blush,
+                }}
+              >
+                <Text variant="caption">
+                  {t('catalog.page.handmadeIn', { city: product.maker.city })}
+                </Text>
+              </View>
+            </View>
+            <ShareButton
+              subject={{
+                type: 'product',
+                id: product.id,
+                title,
+                makerName: product.maker.businessName,
+              }}
+            />
+            <SaveButton productId={product.id} title={title} source="product" />
           </View>
           <Text variant="title" accessibilityRole="header">
             {title}
@@ -256,6 +274,7 @@ function ProductDetails({ product }: { product: PublicProduct }) {
             <Text>{description}</Text>
           </View>
         ) : null}
+        <ReportLink target={{ type: 'product', id: product.id }} />
       </View>
     </View>
   );

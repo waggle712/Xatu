@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import { reportReasonSchema } from './social.ts';
 
 const id = z.string().uuid();
 const fulfilmentMode = z.enum(['courier', 'pickup', 'local_delivery']);
 const mediaPurpose = z.enum(['shop_cover', 'product_photo']);
+const shareTargetType = z.enum(['product', 'shop']);
+const handle = z.string().max(30);
 
 /**
  * Pilot analytics events (30-day pilot targets). Shared by the API and the app so both
@@ -69,6 +72,23 @@ export const analyticsEvents = {
     reason: z.enum(['permission', 'network', 'rejected', 'timeout', 'unknown']),
     reject_reason: z.string().max(40).optional(),
   }),
+  /** A buyer saved a product (heart). */
+  product_saved: z.strictObject({
+    product_id: id,
+    source: z.enum(['feed', 'search', 'product', 'saved']),
+  }),
+  product_unsaved: z.strictObject({ product_id: id }),
+  shop_followed: z.strictObject({ shop_handle: handle }),
+  shop_unfollowed: z.strictObject({ shop_handle: handle }),
+  /** The share sheet was opened for a product or shop link. */
+  share_tapped: z.strictObject({ target_type: shareTargetType }),
+  /** The app was opened from a shared link. */
+  share_link_opened: z.strictObject({ target_type: shareTargetType, signed_in: z.boolean() }),
+  /** A report was sent. Only the reason; the details text never goes to analytics. */
+  report_submitted: z.strictObject({
+    target_type: shareTargetType,
+    reason: reportReasonSchema,
+  }),
 } as const;
 
 export type AnalyticsEventName = keyof typeof analyticsEvents;
@@ -99,6 +119,12 @@ export const FEATURE_FLAGS = {
     key: 'discovery',
     default: false,
     description: 'Home feed, search and map. Needs `catalog` on too (cards open product pages).',
+  },
+  social: {
+    key: 'social',
+    default: false,
+    description:
+      'Save (heart), follow a maker, share links and report. Needs `catalog` on too (product pages).',
   },
   catalog: {
     key: 'catalog',

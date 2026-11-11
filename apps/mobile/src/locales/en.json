@@ -60,7 +60,11 @@
       "fulfilment_not_offered": "Turn this delivery option on for your shop first.",
       "lead_time_invalid": "Days to make are only for made-to-order products.",
       "stock_changed": "Stock changed since you opened this. Check the new number and try again.",
-      "invalid_cursor": "This page link has expired. Pull down to refresh."
+      "invalid_cursor": "This page link has expired. Pull down to refresh.",
+      "saved_list_full": "Your Saved list is full. Remove some to save more.",
+      "following_list_full": "You follow the most shops allowed. Unfollow some to follow more.",
+      "cannot_follow_own_shop": "You can't follow your own shop.",
+      "cannot_report_own": "You can't report your own shop or listing."
     }
   },
   "tabs": {
@@ -377,5 +381,49 @@
     "emptyBody": "No makers have listed products near you yet. Check back soon.",
     "emptyCategory": "Nothing in this category nearby yet. Try Near me.",
     "kmNear": "under 1 km"
+  },
+  "social": {
+    "saveLabel": "Save {{title}}",
+    "unsaveLabel": "Remove {{title}} from Saved",
+    "saveFailed": "Couldn't update Saved",
+    "follow": "Follow",
+    "following": "Following",
+    "followLabel": "Follow {{name}}",
+    "unfollowLabel": "Unfollow {{name}}",
+    "followFailed": "Couldn't update Following",
+    "followers": "Followers",
+    "share": "Share",
+    "shareProductText": "{{title}} by {{maker}}, on {{app}}",
+    "shareShopText": "{{name}} on {{app}}",
+    "savedTitle": "Saved",
+    "savedEmpty": "Nothing saved yet",
+    "savedEmptyBody": "Tap the heart on anything you like to find it here later.",
+    "followingTitle": "Following",
+    "followingEmpty": "You're not following anyone yet",
+    "followingEmptyBody": "Follow makers you like from their shop page.",
+    "shopPaused": "Not taking orders right now",
+    "browse": "Browse makers near you",
+    "showMore": "Show more",
+    "reportProduct": "Report this listing",
+    "reportShop": "Report this shop",
+    "reportTitle": "Report",
+    "reportIntro": "Tell us what's wrong. The maker won't see who reported.",
+    "reasons": {
+      "counterfeit": "Fake or copied item",
+      "prohibited": "Not allowed to be sold",
+      "misleading": "Photos or details are misleading",
+      "unsafe": "Unsafe, spoiled or expired",
+      "offensive": "Offensive or hateful",
+      "scam": "Scam or asked to pay outside the app",
+      "other": "Something else"
+    },
+    "details": "More details (optional)",
+    "detailsRequired": "What's wrong?",
+    "detailsHint": "Please don't include phone numbers or addresses.",
+    "sendReport": "Send report",
+    "reportThanks": "Thanks for telling us",
+    "reportAlready": "You've already reported this",
+    "reportThanksBody": "Our team will look into it. We'll take action if it breaks our rules.",
+    "done": "Done"
   }
 }

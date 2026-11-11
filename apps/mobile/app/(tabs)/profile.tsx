@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { SectionRow } from '../../src/components/Rows';
 import { Screen } from '../../src/components/Screen';
 import { useMyShop } from '../../src/features/shop/api';
+import { useSocialEnabled } from '../../src/features/social/api';
 import { useFeatureFlag } from '../../src/lib/analytics';
 import { logout } from '../../src/features/auth/api';
 import { formatIndianPhone } from '../../src/lib/phone';
@@ -21,6 +22,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const sellerOnboarding = useFeatureFlag('seller_onboarding');
   const myShop = useMyShop();
+  const social = useSocialEnabled();
 
   return (
     <Screen>
@@ -42,6 +44,16 @@ export default function ProfileScreen() {
         </Text>
         <Text variant="heading">{user ? formatIndianPhone(user.phone) : ''}</Text>
       </View>
+
+      {social ? (
+        <>
+          <SectionRow label={t('social.savedTitle')} onPress={() => router.push('/saved')} />
+          <SectionRow
+            label={t('social.followingTitle')}
+            onPress={() => router.push('/following')}
+          />
+        </>
+      ) : null}
 
       {myShop.data ? (
         <SectionRow
