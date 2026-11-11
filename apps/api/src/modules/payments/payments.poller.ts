@@ -8,6 +8,7 @@ import { OutboxRelay } from '../../outbox/outbox.relay.js';
 import { bullConnection, QUEUES } from '../../queue/queue.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { PaymentsService } from './payments.service.js';
+import { RefundsService } from './refunds.service.js';
 import { WebhookProcessor } from './webhook.processor.js';
 
 /** Give the webhook this long before asking Razorpay ourselves. */
@@ -31,6 +32,7 @@ export class PaymentsPoller implements OnModuleInit, OnModuleDestroy {
     private readonly orders: OrdersService,
     private readonly webhooks: WebhookProcessor,
     private readonly relay: OutboxRelay,
+    private readonly refunds: RefundsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -80,6 +82,7 @@ export class PaymentsPoller implements OnModuleInit, OnModuleDestroy {
     await this.orders.expireDue();
     for (const payment of checked) await this.payments.expireIfOrderClosed(payment);
     if (env.RAZORPAY_KEY_ID) {
+      await this.refunds.pollOnce();
       for (const payment of await this.payments.expiredToRecheck()) {
         await this.payments
           .checkWithProvider(payment)

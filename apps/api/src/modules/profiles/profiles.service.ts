@@ -291,6 +291,17 @@ export class ProfilesService {
     };
   }
 
+  /** For finance (payout CSV): names of any shops, whatever their status. */
+  async payoutNames(
+    sellerIds: string[],
+  ): Promise<Map<string, { handle: string; businessName: string }>> {
+    const rows = await this.prisma.sellerProfile.findMany({
+      where: { id: { in: sellerIds } },
+      select: { id: true, handle: true, businessName: true },
+    });
+    return new Map(rows.map((r) => [r.id, { handle: r.handle, businessName: r.businessName }]));
+  }
+
   // ───────────────────────────── Following ─────────────────────────────
 
   /** Follows a public shop by handle. Safe to repeat. You can't follow your own shop. */

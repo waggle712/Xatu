@@ -277,6 +277,48 @@ export class PaymentsService {
     });
   }
 
+  // ── For the ledger (it never reads payment tables itself) ──
+
+  /** Payments whose money was captured (verified, or later refunded / refund_pending). */
+  async capturedPayments() {
+    return this.prisma.payment.findMany({
+      where: {
+        status: {
+          in: [
+            'verified',
+            'settlement_eligible',
+            'settled',
+            'refund_pending',
+            'refunded',
+            'disputed',
+          ],
+        },
+      },
+      select: {
+        id: true,
+        orderId: true,
+        amountPaise: true,
+        providerPaymentId: true,
+        verifiedAt: true,
+      },
+    });
+  }
+
+  async byProviderPaymentId(providerPaymentId: string) {
+    return this.prisma.payment.findUnique({
+      where: { providerPaymentId },
+      select: { id: true, orderId: true, amountPaise: true, status: true },
+    });
+  }
+
+  /** Refunds Razorpay processed (completeness check and reconciliation). */
+  async completedRefunds() {
+    return this.prisma.refundRequest.findMany({
+      where: { status: 'completed' },
+      select: { id: true, paymentId: true, amountPaise: true, providerRefundId: true },
+    });
+  }
+
   private openPayment(orderId: string) {
     return this.prisma.payment.findFirst({
       where: { orderId, status: { in: ['initiated', 'pending', 'verified'] } },

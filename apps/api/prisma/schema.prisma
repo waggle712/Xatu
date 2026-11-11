@@ -599,6 +599,8 @@ model Order {
   deliveryFeePaise BigInt         @default(0) @map("delivery_fee_paise")
   /// Commission over all items (seller-side; never added to what the buyer pays).
   commissionPaise  BigInt         @default(0) @map("commission_paise")
+  /// When the order reached `completed` (pickup or delivery done). Settlement starts 48h later.
+  completedAt      DateTime?      @map("completed_at")
   /// Unpaid orders stop holding stock at this time (awaiting_payment only).
   expiresAt        DateTime?      @map("expires_at")
   totalPaise       BigInt         @map("total_paise")
@@ -731,7 +733,10 @@ model RefundRequest {
   reason           String
   status           RefundStatus @default(requested)
   providerRefundId String?      @unique @map("provider_refund_id")
-  requestedById    String       @map("requested_by_id") @db.Uuid
+  /// Null for automatic (system) refunds.
+  requestedById    String?      @map("requested_by_id") @db.Uuid
+  failureReason    String?      @map("failure_reason")
+  attempts         Int          @default(0)
   approvedById     String?      @map("approved_by_id") @db.Uuid
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
@@ -779,14 +784,16 @@ model LedgerAccount {
 
 /// Groups balanced entries for one business event (payment verified, refund, payout...).
 model LedgerTransaction {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  kind        String
+  id             String   @id @default(uuid(7)) @db.Uuid
+  /// What makes this transaction post exactly once, e.g. receipt:<paymentId>.
+  idempotencyKey String   @unique @map("idempotency_key")
+  kind           String
   /// What caused it, e.g. payment id or refund id. Unique per kind so it is posted once.
-  referenceId String   @map("reference_id")
-  description String?
-  postedAt    DateTime @default(now()) @map("posted_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  referenceId    String   @map("reference_id")
+  description    String?
+  postedAt       DateTime @default(now()) @map("posted_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   entries LedgerEntry[]
 
@@ -922,4 +929,130 @@ model SearchTransliteration {
 
   @@unique([latin, tamil])
   @@map("search_transliterations")
+}
+
+// ───────────────────────────── Ledger: rates, settlements, reconciliation ─────────────────────────────
+
+/// Dated finance config (TCS, TDS, GST on commission). The rate in force on a date wins; the CA
+/// changes a rate by adding a row with a new valid_from, never by editing code.
+model FinanceRate {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  key       String
+  rateBps   Int       @map("rate_bps")
+  /// What the rate applies to, e.g. items_incl_gst.
+  base      String
+  note      String?
+  validFrom DateTime  @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([key, validFrom])
+  @@map("finance_rates")
+}
+
+enum SettlementStatus {
+  pending_approval
+  approved
+  exported
+  paid
+  cancelled
+}
+
+/// One seller's payout for one business day (IST), after the 48h dispute window.
+model SettlementBatch {
+  id                 String           @id @default(uuid(7)) @db.Uuid
+  sellerId           String           @map("seller_id") @db.Uuid
+  businessDay        DateTime         @map("business_day") @db.Date
+  status             SettlementStatus @default(pending_approval)
+  grossPaise         BigInt           @map("gross_paise")
+  commissionPaise    BigInt           @map("commission_paise")
+  commissionGstPaise BigInt           @map("commission_gst_paise")
+  tcsPaise           BigInt           @map("tcs_paise")
+  tdsPaise           BigInt           @map("tds_paise")
+  netPaise           BigInt           @map("net_paise")
+  approvedById       String?          @map("approved_by_id") @db.Uuid
+  approvedAt         DateTime?        @map("approved_at")
+  exportedAt         DateTime?        @map("exported_at")
+  paidAt             DateTime?        @map("paid_at")
+  /// Bank transfer reference (UTR) entered by finance when marking it paid.
+  paymentReference   String?          @map("payment_reference")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  lines SettlementLine[]
+
+  @@unique([sellerId, businessDay])
+  @@index([status, businessDay])
+  @@map("settlement_batches")
+}
+
+/// One order in a batch, with the rates it used. An order is settled once, ever.
+model SettlementLine {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  batchId            String   @map("batch_id") @db.Uuid
+  orderId            String   @unique @map("order_id") @db.Uuid
+  itemsPaise         BigInt   @map("items_paise")
+  deliveryPaise      BigInt   @map("delivery_paise")
+  grossPaise         BigInt   @map("gross_paise")
+  commissionPaise    BigInt   @map("commission_paise")
+  commissionGstPaise BigInt   @map("commission_gst_paise")
+  tcsPaise           BigInt   @map("tcs_paise")
+  tdsPaise           BigInt   @map("tds_paise")
+  netPaise           BigInt   @map("net_paise")
+  tcsBps             Int      @map("tcs_bps")
+  tdsBps             Int      @map("tds_bps")
+  commissionGstBps   Int      @map("commission_gst_bps")
+  /// The date whose rates were used (the order's completion time).
+  ratesAt            DateTime @map("rates_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  batch SettlementBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+  @@map("settlement_lines")
+}
+
+/// One nightly comparison with Razorpay's settlement report for a day.
+model ReconciliationRun {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  day        DateTime  @unique @db.Date
+  items      Int       @default(0)
+  issues     Int       @default(0)
+  finishedAt DateTime? @map("finished_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("reconciliation_runs")
+}
+
+/// Every item seen in a Razorpay settlement report (so a missing payment can be noticed).
+model ReconciliationItem {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  entityId    String   @unique @map("entity_id")
+  type        String
+  amountPaise BigInt   @map("amount_paise")
+  feePaise    BigInt   @map("fee_paise")
+  taxPaise    BigInt   @map("tax_paise")
+  settled     Boolean
+  day         DateTime @db.Date
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("reconciliation_items")
+}
+
+/// A mismatch between our records and Razorpay's (alerted once).
+model ReconciliationIssue {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  kind       String
+  entityId   String    @map("entity_id")
+  details    Json
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@unique([kind, entityId])
+  @@map("reconciliation_issues")
 }

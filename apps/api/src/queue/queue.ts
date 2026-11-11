@@ -12,4 +12,5 @@ export const QUEUES = {
   outboxRelay: 'outbox-relay',
   razorpayWebhooks: 'razorpay-webhooks',
   paymentsPoller: 'payments-poller',
+  ledgerNightly: 'ledger-nightly',
 } as const;

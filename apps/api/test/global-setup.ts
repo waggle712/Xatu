@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
+import pg_ from 'pg';
+
+const { Client } = pg_;
 
 let pg: StartedPostgreSqlContainer | undefined;
 let redis: StartedRedisContainer | undefined;
@@ -43,6 +46,21 @@ export async function setup(): Promise<void> {
   });
 
   execSync('npx prisma migrate deploy', { stdio: 'inherit', env: process.env });
+
+  // Run the app under the production grants: a login user in the xatu_app role, which may only
+  // SELECT and INSERT on ledger tables. Migrations above ran as the owner.
+  const appUser = 'xatu_app_test';
+  const appPassword = 'app_test_only_password';
+  const owner = new Client({ connectionString: pg.getConnectionUri() });
+  await owner.connect();
+  await owner.query(`CREATE ROLE ${appUser} LOGIN PASSWORD '${appPassword}' IN ROLE xatu_app`);
+  await owner.end();
+
+  const url = new URL(pg.getConnectionUri());
+  url.username = appUser;
+  url.password = appPassword;
+  process.env.DATABASE_URL = url.toString();
+  process.env.DATABASE_OWNER_URL = pg.getConnectionUri();
 }
 
 export async function teardown(): Promise<void> {

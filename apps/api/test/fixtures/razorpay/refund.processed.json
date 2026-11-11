@@ -1,0 +1,40 @@
+{
+  "entity": "event",
+  "account_id": "acc_TestAccount00001",
+  "event": "refund.processed",
+  "contains": ["refund", "payment"],
+  "payload": {
+    "refund": {
+      "entity": {
+        "id": "__REFUND_ID__",
+        "entity": "refund",
+        "amount": "__AMOUNT__",
+        "currency": "INR",
+        "payment_id": "__PAYMENT_ID__",
+        "notes": { "order_id": "__XATU_ORDER_ID__" },
+        "receipt": "__RECEIPT__",
+        "acquirer_data": { "arn": "74836592847562" },
+        "created_at": "__CREATED_AT__",
+        "batch_id": null,
+        "status": "processed",
+        "speed_processed": "normal",
+        "speed_requested": "normal"
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "__PAYMENT_ID__",
+        "entity": "payment",
+        "amount": "__AMOUNT__",
+        "currency": "INR",
+        "status": "refunded",
+        "order_id": "__ORDER_ID__",
+        "amount_refunded": "__AMOUNT__",
+        "refund_status": "full",
+        "captured": true,
+        "created_at": "__CREATED_AT__"
+      }
+    }
+  },
+  "created_at": "__CREATED_AT__"
+}

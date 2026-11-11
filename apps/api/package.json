@@ -18,7 +18,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "bench:feed": "nest build && node --env-file=.env --import tsx scripts/bench-feed.ts"
+    "bench:feed": "nest build && node --env-file=.env --import tsx scripts/bench-feed.ts",
+    "finance": "node --env-file-if-exists=.env dist/src/cli/finance.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1164.0",
@@ -53,8 +54,11 @@
     "@testcontainers/redis": "^12.2.1",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
     "@types/supertest": "^7.0.0",
     "eslint": "^10.14.0",
+    "fast-check": "4.3.0",
+    "pg": "8.23.1",
     "prisma": "7.10.1",
     "supertest": "^7.3.2",
     "testcontainers": "^12.2.1",
