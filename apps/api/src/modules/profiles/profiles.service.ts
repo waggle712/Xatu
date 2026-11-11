@@ -18,6 +18,7 @@ import {
 } from '@xatu/shared';
 import { AnalyticsService } from '../../analytics/analytics.service.js';
 import { AppError } from '../../common/errors.js';
+import { paiseToBigInt, paiseToNumber } from '../../common/money.js';
 import { MediaService } from '../media/media.service.js';
 import { Prisma, type SellerProfile } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -131,12 +132,15 @@ export class ProfilesService {
         );
     }
     if (patch.coverMediaId) await this.media.requireReady(userId, patch.coverMediaId, 'shop_cover');
-    const { location, openingHours, ...fields } = patch;
+    const { location, openingHours, localDeliveryFeePaise, ...fields } = patch;
     await this.prisma.$transaction(async (tx) => {
       await tx.sellerProfile.update({
         where: { id: shop.id },
         data: {
           ...fields,
+          ...(localDeliveryFeePaise === undefined
+            ? {}
+            : { localDeliveryFeePaise: paiseToBigInt(localDeliveryFeePaise) }),
           ...(openingHours ? { openingHours: openingHours as Prisma.InputJsonValue } : {}),
         },
       });
@@ -199,7 +203,8 @@ export class ProfilesService {
       this.prisma.product.count({
         where: { sellerId: shop.id, status: 'active', moderationStatus: 'live' },
       }),
-      this.prisma.order.count({ where: { sellerId: shop.id, status: 'delivered' } }),
+      // Documented exception: orders imports profiles, so profiles can't call OrdersService.
+      this.prisma.order.count({ where: { sellerId: shop.id, status: 'completed' } }),
       this.prisma.shopFollow.count({ where: { sellerId: shop.id } }),
     ]);
     return {
@@ -265,6 +270,25 @@ export class ProfilesService {
       select: { id: true, status: true },
     });
     return shop && PUBLIC_SELLER_STATUSES.includes(shop.status) ? shop.id : null;
+  }
+
+  // ───────────────────────────── Used by orders ─────────────────────────────
+
+  /** What checkout needs about a shop: who owns it, whether it takes orders, modes and fee. */
+  async shopForOrder(sellerId: string): Promise<OrderingShop | null> {
+    const shop = await this.prisma.sellerProfile.findUnique({ where: { id: sellerId } });
+    if (!shop || !PUBLIC_SELLER_STATUSES.includes(shop.status)) return null;
+    return {
+      id: shop.id,
+      ownerUserId: shop.userId,
+      handle: shop.handle,
+      businessName: shop.businessName,
+      areaName: shop.areaName,
+      city: shop.city,
+      acceptingOrders: shop.status === 'active',
+      offeredModes: offeredModes(shop),
+      localDeliveryFeePaise: shop.localDeliveryFeePaise,
+    };
   }
 
   // ───────────────────────────── Following ─────────────────────────────
@@ -422,6 +446,7 @@ export class ProfilesService {
       openingHours,
       pickupAvailable: shop.pickupAvailable,
       localDelivery: shop.localDelivery,
+      localDeliveryFeePaise: paiseToNumber(shop.localDeliveryFeePaise),
       cover: shop.coverMediaId
         ? this.media.toImage(
             await this.prisma.mediaAsset.findUnique({ where: { id: shop.coverMediaId } }),
@@ -459,6 +484,18 @@ export interface OwnerShop {
   status: SellerStatus;
   categoryId: string | null;
   offeredModes: FulfilmentMode[];
+}
+
+export interface OrderingShop {
+  id: string;
+  ownerUserId: string;
+  handle: string;
+  businessName: string;
+  areaName: string | null;
+  city: string;
+  acceptingOrders: boolean;
+  offeredModes: FulfilmentMode[];
+  localDeliveryFeePaise: bigint;
 }
 
 export interface PublicSellerSummary {

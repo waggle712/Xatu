@@ -24,6 +24,10 @@ describe('analytics events', () => {
         'share_tapped',
         'share_link_opened',
         'report_submitted',
+        'cart_item_added',
+        'order_created',
+        'order_failed',
+        'order_cancelled',
       ].sort(),
     );
   });

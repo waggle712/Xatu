@@ -94,6 +94,8 @@ export const updateShopSchema = z
     openingHours: openingHoursSchema,
     pickupAvailable: z.boolean(),
     localDelivery: z.boolean(),
+    /** Flat fee per order for local delivery, in paise (₹0–₹1,000). */
+    localDeliveryFeePaise: z.number().int().min(0).max(100_000),
     /** A ready `shop_cover` upload owned by this user, or null to remove the cover. */
     coverMediaId: z.string().uuid().nullable(),
   })
@@ -152,6 +154,7 @@ export const myShopSchema = z.object({
   openingHours: openingHoursSchema,
   pickupAvailable: z.boolean(),
   localDelivery: z.boolean(),
+  localDeliveryFeePaise: z.number().int(),
   cover: imageSchema.nullable(),
   status: sellerStatusSchema,
   verified: z.boolean(),

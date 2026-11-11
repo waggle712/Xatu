@@ -19,6 +19,7 @@ import { HexAvatar } from '../../src/components/HexAvatar';
 import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/components/States';
 import { XImage } from '../../src/components/XImage';
 import { usePublicProduct } from '../../src/features/catalog/api';
+import { AddToBagButton, BagButton } from '../../src/features/orders/parts';
 import { ReportLink, SaveButton, ShareButton } from '../../src/features/social/SocialButtons';
 import { track, useFeatureFlag } from '../../src/lib/analytics';
 import { ApiRequestError } from '../../src/lib/api';
@@ -27,8 +28,8 @@ import { consumeLink } from '../../src/lib/pendingLink';
 import { useSession } from '../../src/store/session';
 
 /**
- * Product page (Product design), with save, share and report (behind `social`). Not here yet:
- * buying (prompt 14), delivery fees, reviews and trust score (prompt 19). No "money held" copy
+ * Product page (Product design), with save, share and report (behind `social`) and Add to bag
+ * (behind `checkout`). Not here yet: reviews and trust score (prompt 19). No "money held" copy
  * until Protected Pay is confirmed with Razorpay and a lawyer.
  */
 export default function ProductScreen() {
@@ -54,8 +55,16 @@ export default function ProductScreen() {
           <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />
         }
       >
-        <View style={{ paddingHorizontal: theme.space[4] }}>
+        <View
+          style={{
+            paddingHorizontal: theme.space[4],
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
           <BackButton />
+          <BagButton />
         </View>
         <View style={{ paddingHorizontal: theme.space[4] }}>
           <OfflineBanner />
@@ -224,6 +233,12 @@ function ProductDetails({ product }: { product: PublicProduct }) {
             <Text>{t('catalog.page.notAccepting')}</Text>
           </View>
         ) : null}
+
+        <AddToBagButton
+          productId={product.id}
+          variantId={variant.id}
+          disabled={!product.maker.acceptingOrders || variant.stock <= 0}
+        />
 
         {product.fulfilmentModes.length > 0 ? (
           <View style={{ gap: theme.space[2] }}>

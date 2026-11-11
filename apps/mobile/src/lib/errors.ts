@@ -36,6 +36,21 @@ const KNOWN_CODES = [
   'following_list_full',
   'cannot_follow_own_shop',
   'cannot_report_own',
+  'out_of_stock',
+  'price_changed',
+  'cart_has_problems',
+  'cart_empty',
+  'cart_other_seller',
+  'cart_changed',
+  'cart_full',
+  'cannot_buy_own',
+  'shop_not_accepting',
+  'address_not_found',
+  'too_many_addresses',
+  'invalid_order_status',
+  'order_not_found',
+  'idempotency_in_progress',
+  'too_many_unpaid_orders',
 ] as const;
 
 /** Any error → a short message in the person's language. Never shows raw server text. */

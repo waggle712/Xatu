@@ -89,14 +89,20 @@ enum FulfilmentMode {
 
 /// Fulfilment lifecycle. Payment has its own lifecycle (PaymentStatus).
 enum OrderStatus {
-  pending_payment
-  paid
+  draft
+  awaiting_payment
+  placed
   accepted
+  preparing
   ready_for_pickup
-  shipped
-  delivered
-  cancelled
+  out_for_delivery
+  completed
+  expired
+  cancelled_by_buyer
+  cancelled_by_seller
+  in_dispute
   refunded
+  partially_refunded
 }
 
 enum PaymentStatus {
@@ -190,19 +196,20 @@ model User {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  sessions        Session[]
-  deviceTokens    DeviceToken[]
-  consents        ConsentRecord[]
-  sellerProfile   SellerProfile?
-  addresses       Address[]
-  ordersAsBuyer   Order[]                @relation("BuyerOrders")
-  reservations    InventoryReservation[]
-  reviews         Review[]
-  reports         Report[]               @relation("Reporter")
-  idempotencyKeys IdempotencyKey[]
-  mediaAssets     MediaAsset[]
-  savedProducts   SavedProduct[]
-  follows         ShopFollow[]
+  sessions           Session[]
+  deviceTokens       DeviceToken[]
+  consents           ConsentRecord[]
+  sellerProfile      SellerProfile?
+  addresses          Address[]
+  ordersAsBuyer      Order[]                @relation("BuyerOrders")
+  reservations       InventoryReservation[]
+  reviews            Review[]
+  reports            Report[]               @relation("Reporter")
+  idempotencyRecords IdempotencyRecord[]
+  cart               Cart?
+  mediaAssets        MediaAsset[]
+  savedProducts      SavedProduct[]
+  follows            ShopFollow[]
 
   @@map("users")
 }
@@ -261,38 +268,40 @@ model ConsentRecord {
 // ───────────────────────────── Profiles ─────────────────────────────
 
 model SellerProfile {
-  id                 String                                 @id @default(uuid(7)) @db.Uuid
-  userId             String                                 @unique @map("user_id") @db.Uuid
-  handle             String                                 @unique @db.Citext
-  businessName       String                                 @map("business_name")
-  storyEn            String?                                @map("story_en")
-  storyTa            String?                                @map("story_ta")
-  categoryId         String?                                @map("category_id") @db.Uuid
+  id                    String                                 @id @default(uuid(7)) @db.Uuid
+  userId                String                                 @unique @map("user_id") @db.Uuid
+  handle                String                                 @unique @db.Citext
+  businessName          String                                 @map("business_name")
+  storyEn               String?                                @map("story_en")
+  storyTa               String?                                @map("story_ta")
+  categoryId            String?                                @map("category_id") @db.Uuid
   /// Public locality shown to buyers, e.g. "Woraiyur".
-  areaName           String?                                @map("area_name")
-  city               String
-  region             String                                 @default("IN-TN")
-  pincode            String?
+  areaName              String?                                @map("area_name")
+  city                  String
+  region                String                                 @default("IN-TN")
+  pincode               String?
   /// Exact pickup point (PostGIS, WGS 84). PRIVATE: public views only get a rounded location.
-  location           Unsupported("geography(Point, 4326)")?
+  location              Unsupported("geography(Point, 4326)")?
   /// PUBLIC: the exact point rounded to 2 decimals (about 1 km), written with `location`. Discovery
   /// (feed radius, distance, map pins) uses only this, so results can't reveal the exact spot.
-  approxLocation     Unsupported("geography(Point, 4326)")? @map("approx_location")
+  approxLocation        Unsupported("geography(Point, 4326)")? @map("approx_location")
   /// PRIVATE: shown to the owner, and to a buyer only after their order is accepted.
-  pickupAddressLine  String?                                @map("pickup_address_line")
-  pickupLandmark     String?                                @map("pickup_landmark")
+  pickupAddressLine     String?                                @map("pickup_address_line")
+  pickupLandmark        String?                                @map("pickup_landmark")
   /// Weekly hours in IST, validated by openingHoursSchema in @xatu/shared.
-  openingHours       Json                                   @default("{}") @map("opening_hours")
-  coverMediaId       String?                                @map("cover_media_id") @db.Uuid
-  pickupAvailable    Boolean                                @default(true) @map("pickup_available")
-  localDelivery      Boolean                                @default(false) @map("local_delivery")
-  courierAvailable   Boolean                                @default(false) @map("courier_available")
-  verificationStatus VerificationStatus                     @default(unverified) @map("verification_status")
-  verifiedAt         DateTime?                              @map("verified_at")
-  status             SellerStatus                           @default(draft)
-  submittedAt        DateTime?                              @map("submitted_at")
-  createdAt          DateTime                               @default(now()) @map("created_at")
-  updatedAt          DateTime                               @updatedAt @map("updated_at")
+  openingHours          Json                                   @default("{}") @map("opening_hours")
+  coverMediaId          String?                                @map("cover_media_id") @db.Uuid
+  pickupAvailable       Boolean                                @default(true) @map("pickup_available")
+  localDelivery         Boolean                                @default(false) @map("local_delivery")
+  courierAvailable      Boolean                                @default(false) @map("courier_available")
+  /// Flat fee for local delivery, per order, set by the seller (0 = free).
+  localDeliveryFeePaise BigInt                                 @default(0) @map("local_delivery_fee_paise")
+  verificationStatus    VerificationStatus                     @default(unverified) @map("verification_status")
+  verifiedAt            DateTime?                              @map("verified_at")
+  status                SellerStatus                           @default(draft)
+  submittedAt           DateTime?                              @map("submitted_at")
+  createdAt             DateTime                               @default(now()) @map("created_at")
+  updatedAt             DateTime                               @updatedAt @map("updated_at")
 
   user       User         @relation(fields: [userId], references: [id], onDelete: Restrict)
   category   Category?    @relation(fields: [categoryId], references: [id])
@@ -508,6 +517,7 @@ model Address {
   phone     String
   line1     String
   line2     String?
+  landmark  String?
   city      String
   state     String    @default("Tamil Nadu")
   pincode   String
@@ -524,6 +534,36 @@ model Address {
 
 /// Stock held for a buyer during checkout. Committed when payment is verified,
 /// released when payment fails or the reservation expires.
+/// The buyer's bag: one maker at a time. Owned by orders. Holds no stock (stock is held only
+/// when an order is created, by inventory_reservations).
+model Cart {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  sellerId  String   @map("seller_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  cartId    String   @map("cart_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  variantId String   @map("variant_id") @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@map("cart_items")
+}
+
 model InventoryReservation {
   id        String            @id @default(uuid(7)) @db.Uuid
   productId String            @map("product_id") @db.Uuid
@@ -548,24 +588,28 @@ model InventoryReservation {
 }
 
 model Order {
-  id              String         @id @default(uuid(7)) @db.Uuid
+  id               String         @id @default(uuid(7)) @db.Uuid
   /// Short human code shown to buyers and sellers, e.g. XT-2041.
-  code            String         @unique
-  buyerId         String         @map("buyer_id") @db.Uuid
-  sellerId        String         @map("seller_id") @db.Uuid
-  status          OrderStatus    @default(pending_payment)
-  fulfilmentMode  FulfilmentMode @map("fulfilment_mode")
-  subtotalPaise   BigInt         @map("subtotal_paise")
-  shippingPaise   BigInt         @default(0) @map("shipping_paise")
-  totalPaise      BigInt         @map("total_paise")
+  code             String         @unique
+  buyerId          String         @map("buyer_id") @db.Uuid
+  sellerId         String         @map("seller_id") @db.Uuid
+  status           OrderStatus    @default(awaiting_payment)
+  fulfilmentMode   FulfilmentMode @map("fulfilment_mode")
+  subtotalPaise    BigInt         @map("subtotal_paise")
+  deliveryFeePaise BigInt         @default(0) @map("delivery_fee_paise")
+  /// Commission over all items (seller-side; never added to what the buyer pays).
+  commissionPaise  BigInt         @default(0) @map("commission_paise")
+  /// Unpaid orders stop holding stock at this time (awaiting_payment only).
+  expiresAt        DateTime?      @map("expires_at")
+  totalPaise       BigInt         @map("total_paise")
   /// Copy of the delivery address at purchase time (null for pickup).
-  addressSnapshot Json?          @map("address_snapshot")
+  addressSnapshot  Json?          @map("address_snapshot")
   /// Copy of seller name, handle and pickup place at purchase time.
-  sellerSnapshot  Json           @map("seller_snapshot")
-  region          String         @default("IN-TN")
-  city            String?
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  sellerSnapshot   Json           @map("seller_snapshot")
+  region           String         @default("IN-TN")
+  city             String?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
   buyer          User                   @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
   seller         SellerProfile          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict)
@@ -577,6 +621,7 @@ model Order {
 
   @@index([buyerId, createdAt])
   @@index([sellerId, status])
+  @@index([status, expiresAt])
   @@map("orders")
 }
 
@@ -587,9 +632,12 @@ model OrderItem {
   variantId        String   @map("variant_id") @db.Uuid
   /// Purchase-time copies, so later listing edits never change what was bought.
   titleSnapshot    String   @map("title_snapshot")
+  titleTaSnapshot  String?  @map("title_ta_snapshot")
   variantSnapshot  String?  @map("variant_snapshot")
   unitPricePaise   BigInt   @map("unit_price_paise")
   quantity         Int
+  lineTotalPaise   BigInt   @map("line_total_paise")
+  commissionPaise  BigInt   @default(0) @map("commission_paise")
   /// Commission in basis points (500 = 5%) from the rule active at purchase time.
   commissionBps    Int      @map("commission_bps")
   commissionRuleId String?  @map("commission_rule_id") @db.Uuid
@@ -754,7 +802,8 @@ model LedgerEntry {
 }
 
 /// Stored responses for Idempotency-Key headers on money endpoints.
-model IdempotencyKey {
+/// Idempotency-Key header records for mutating order and money endpoints.
+model IdempotencyRecord {
   id           String            @id @default(uuid(7)) @db.Uuid
   key          String
   userId       String            @map("user_id") @db.Uuid
@@ -770,7 +819,7 @@ model IdempotencyKey {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, endpoint, key])
-  @@map("idempotency_keys")
+  @@map("idempotency_records")
 }
 
 // ───────────────────────────── Trust and safety ─────────────────────────────

@@ -64,7 +64,22 @@
       "saved_list_full": "Your Saved list is full. Remove some to save more.",
       "following_list_full": "You follow the most shops allowed. Unfollow some to follow more.",
       "cannot_follow_own_shop": "You can't follow your own shop.",
-      "cannot_report_own": "You can't report your own shop or listing."
+      "cannot_report_own": "You can't report your own shop or listing.",
+      "out_of_stock": "Sorry, not enough left. Someone else got there first.",
+      "price_changed": "The price changed. Check the new total and try again.",
+      "cart_has_problems": "Something in your bag is no longer available.",
+      "cart_empty": "Your bag is empty.",
+      "cart_other_seller": "Your bag has items from another maker.",
+      "cart_changed": "Your bag changed. Check it and try again.",
+      "cart_full": "Your bag is full.",
+      "cannot_buy_own": "You can't buy from your own shop.",
+      "shop_not_accepting": "This maker isn't taking orders right now.",
+      "address_not_found": "This address isn't available.",
+      "too_many_addresses": "You've saved the most addresses allowed.",
+      "invalid_order_status": "This order can't be changed now.",
+      "order_not_found": "Order not found.",
+      "idempotency_in_progress": "Still working on it. Try again in a moment.",
+      "too_many_unpaid_orders": "You have unpaid orders waiting. Pay or cancel one first."
     }
   },
   "tabs": {
@@ -98,7 +113,10 @@
   },
   "orders": {
     "title": "Orders",
-    "empty": "Your orders will show here."
+    "empty": "Your orders will show here.",
+    "none": "No orders yet",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items"
   },
   "profile": {
     "title": "Profile",
@@ -169,7 +187,9 @@
       "storyTa": "Your story (Tamil)",
       "storyHint": "Who you are and how you make it. Up to 600 characters.",
       "pickup": "Buyers can pick up from me",
-      "localDelivery": "I deliver nearby"
+      "localDelivery": "I deliver nearby",
+      "deliveryFee": "Local delivery fee per order",
+      "deliveryFeeError": "Enter ₹0 to ₹1,000"
     },
     "location": {
       "title": "Pickup area",
@@ -425,5 +445,100 @@
     "reportAlready": "You've already reported this",
     "reportThanksBody": "Our team will look into it. We'll take action if it breaks our rules.",
     "done": "Done"
+  },
+  "bag": {
+    "title": "Your bag",
+    "from": "From {{name}}",
+    "add": "Add to bag",
+    "added": "Added to your bag",
+    "keepShopping": "Keep looking",
+    "view": "View bag",
+    "otherMakerTitle": "Start a new bag?",
+    "otherMakerBody": "Your bag has items from {{name}}. A bag holds one maker at a time.",
+    "keepBag": "Keep my bag",
+    "startNew": "Start new bag",
+    "addFailed": "Couldn't add to bag",
+    "open": "Open bag",
+    "openWithCount": "Open bag, {{count}} items",
+    "quantityOf": "{{title}}, quantity {{count}}",
+    "less": "One less",
+    "more": "One more",
+    "empty": "Your bag is empty",
+    "emptyBody": "Add things you like from a maker near you.",
+    "subtotal": "Items",
+    "inclGst": "Prices include GST.",
+    "fixProblems": "Fix the items marked above to check out.",
+    "checkout": "Check out",
+    "unavailableItem": "Item no longer available",
+    "updateFailed": "Couldn't update your bag",
+    "problemUnavailable": "No longer available. Remove it to check out.",
+    "problemStock": "Only {{count}} left. Lower the quantity to check out.",
+    "remove": "Remove {{title}}",
+    "removeShort": "Remove"
+  },
+  "checkout": {
+    "title": "Check out",
+    "how": "How you'll get it",
+    "modes": {
+      "pickup": "Pick up from the maker",
+      "local_delivery": "Local delivery"
+    },
+    "free": "Free",
+    "pickupHint": "Near {{place}}. The exact spot is shared when the maker accepts.",
+    "deliveryHint": "The maker delivers to your address.",
+    "deliverTo": "Deliver to",
+    "addAddress": "Add an address",
+    "deliveryFee": "Delivery",
+    "total": "Total",
+    "holdNote": "We'll keep these items for you for 15 minutes while you pay.",
+    "place": "Place order"
+  },
+  "address": {
+    "title": "New address",
+    "subtitle": "For local delivery.",
+    "name": "Name",
+    "phone": "Mobile number",
+    "line1": "House, street",
+    "line2": "Area (optional)",
+    "landmark": "Landmark (optional)",
+    "city": "City",
+    "pincode": "Pincode",
+    "save": "Save address",
+    "errors": {
+      "name": "Enter a name",
+      "phone": "Enter a 10-digit mobile number",
+      "line1": "Enter your house and street",
+      "city": "Enter the city",
+      "pincode": "Enter a 6-digit pincode"
+    }
+  },
+  "order": {
+    "title": "Order {{code}}",
+    "notFound": "Order not found",
+    "notFoundBody": "It may belong to another account.",
+    "awaitingTitle": "Items kept for you until {{time}}",
+    "awaitingBody": "Online payment is coming soon. If the order isn't paid in time, the items go back on sale.",
+    "expiredBody": "This order wasn't paid in time, so the items went back on sale.",
+    "cancel": "Cancel order",
+    "cancelTitle": "Cancel this order?",
+    "cancelBody": "The items go back on sale.",
+    "keep": "Keep order",
+    "cancelFailed": "Couldn't cancel"
+  },
+  "orderStatus": {
+    "draft": "Draft",
+    "awaiting_payment": "Waiting for payment",
+    "placed": "Placed",
+    "accepted": "Accepted",
+    "preparing": "Being made",
+    "ready_for_pickup": "Ready to collect",
+    "out_for_delivery": "Out for delivery",
+    "completed": "Completed",
+    "expired": "Expired",
+    "cancelled_by_buyer": "Cancelled by you",
+    "cancelled_by_seller": "Cancelled by the maker",
+    "in_dispute": "Being looked into",
+    "refunded": "Refunded",
+    "partially_refunded": "Partly refunded"
   }
 }
