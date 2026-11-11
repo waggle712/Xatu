@@ -537,6 +537,111 @@ describe('Payments and Razorpay webhooks (e2e)', () => {
     ).toBe('refund_pending');
   });
 
+  it('the order screen sees its payment: a refund is visible to the buyer, and only to the buyer', async () => {
+    const o = await unpaidOrder();
+    const start = await startPayment(o);
+    await http()
+      .post(`/orders/${o.orderId}/cancel`)
+      .set(auth(o.buyer.token))
+      .set(key())
+      .expect(200);
+    const paid = razorpay.attempt(start.providerOrderId, 'captured');
+    await postWebhook('payment.captured', {
+      orderId: start.providerOrderId,
+      paymentId: paid.id,
+      amount: o.total,
+      xatuOrderId: o.orderId,
+    }).expect(200);
+    await settle();
+    const view = await http()
+      .get(`/orders/${o.orderId}/payment`)
+      .set(auth(o.buyer.token))
+      .expect(200);
+    expect(view.body.payment).toMatchObject({ id: start.paymentId, status: 'refund_pending' });
+    const other = await signInNewUser(app);
+    await http().get(`/orders/${o.orderId}/payment`).set(auth(other.token)).expect(404);
+    const none = await unpaidOrder();
+    expect(
+      (await http().get(`/orders/${none.orderId}/payment`).set(auth(none.buyer.token)).expect(200))
+        .body.payment,
+    ).toBeNull();
+  });
+
+  it('reopening the app after paying: the order screen checks with Razorpay right away', async () => {
+    const o = await unpaidOrder();
+    const start = await startPayment(o);
+    razorpay.attempt(start.providerOrderId, 'captured');
+    // No webhook, no poller run: just the buyer opening the order again.
+    const view = await http()
+      .get(`/orders/${o.orderId}/payment`)
+      .set(auth(o.buyer.token))
+      .expect(200);
+    expect(view.body.payment.status).toBe('verified');
+    await settle();
+    expect((await orderRow(o.orderId)).status).toBe('placed');
+  });
+
+  it('paid just before the hold ran out, webhook late: checked with Razorpay before the order is expired', async () => {
+    const o = await unpaidOrder({ stock: 5 });
+    const start = await startPayment(o); // created just now: still inside the webhook grace period
+    razorpay.attempt(start.providerOrderId, 'captured');
+    const past = new Date(Date.now() - 1000);
+    await prisma.order.update({ where: { id: o.orderId }, data: { expiresAt: past } });
+    await prisma.inventoryReservation.updateMany({
+      where: { orderId: o.orderId },
+      data: { expiresAt: past },
+    });
+    await poller().pollOnce();
+    await settle();
+    expect((await orderRow(o.orderId)).status).toBe('placed');
+    expect(
+      await prisma.orderEvent.count({ where: { orderId: o.orderId, toStatus: 'expired' } }),
+    ).toBe(0);
+  });
+
+  it('an expired payment captured later with no webhook is still found (re-checked within 72 hours)', async () => {
+    const o = await unpaidOrder({ stock: 5 });
+    const start = await startPayment(o);
+    const past = new Date(Date.now() - 2 * 60 * 60_000);
+    await prisma.order.update({ where: { id: o.orderId }, data: { expiresAt: past } });
+    await prisma.inventoryReservation.updateMany({
+      where: { orderId: o.orderId },
+      data: { expiresAt: past },
+    });
+    await prisma.payment.update({ where: { id: start.paymentId }, data: { createdAt: past } });
+    await poller().pollOnce();
+    await settle();
+    expect(
+      (await prisma.payment.findUniqueOrThrow({ where: { id: start.paymentId } })).status,
+    ).toBe('expired');
+    // The capture lands later and its webhook is lost.
+    razorpay.attempt(start.providerOrderId, 'captured');
+    await prisma.payment.update({ where: { id: start.paymentId }, data: { lastCheckedAt: past } });
+    await poller().pollOnce();
+    await settle();
+    expect(
+      (await prisma.payment.findUniqueOrThrow({ where: { id: start.paymentId } })).status,
+    ).toBe('verified');
+    expect((await orderRow(o.orderId)).status).toBe('placed');
+  });
+
+  it('forged webhooks are stored small', async () => {
+    const big = JSON.stringify({ event: 'payment.captured', junk: 'x'.repeat(50_000) });
+    const eventId = `evt_big${Date.now()}`;
+    await http()
+      .post('/webhooks/razorpay')
+      .set('Content-Type', 'application/json')
+      .set('X-Razorpay-Signature', 'f'.repeat(64))
+      .set('x-razorpay-event-id', eventId)
+      .send(big)
+      .expect(400);
+    const row = await prisma.paymentWebhookEvent.findFirstOrThrow({
+      where: { providerEventId: eventId },
+    });
+    expect(row.rawBody.length).toBeLessThanOrEqual(1100);
+    expect(row.payload).toMatchObject({ truncated: true, bytes: big.length });
+  });
+
   // ───────────────────────────── Outbox ─────────────────────────────
 
   it('the outbox relay marks rows with no subscribers as published and never re-runs a handled row', async () => {

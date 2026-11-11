@@ -336,6 +336,16 @@ export class OrdersService {
     });
   }
 
+  /** For payments: unpaid orders whose hold time is over (check them with Razorpay first). */
+  async dueForExpiry(limit = 200): Promise<string[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { status: 'awaiting_payment', expiresAt: { lte: new Date() } },
+      select: { id: true },
+      take: limit,
+    });
+    return rows.map((r) => r.id);
+  }
+
   /** For payments: an order's current status, or null. */
   async statusOf(orderId: string): Promise<OrderStatus | null> {
     const row = await this.prisma.order.findUnique({

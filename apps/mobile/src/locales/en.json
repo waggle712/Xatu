@@ -551,6 +551,9 @@
     "confirmingBody": "This takes a few seconds. You can leave this screen; we'll update your order.",
     "confirmingSlow": "Your bank is taking longer than usual. We'll update your order as soon as it confirms. You can close the app.",
     "cancelled": "Payment not completed. You can try again.",
-    "failed": "The payment didn't go through. Try again or use another UPI app."
+    "failed": "The payment didn't go through. Try again or use another UPI app.",
+    "refundTitle": "Your money is coming back",
+    "refundedTitle": "Refunded",
+    "refundBody": "This payment couldn't be used for the order, so it will be refunded to how you paid. We'll update this when it's done."
   }
 }

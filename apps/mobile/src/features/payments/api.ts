@@ -5,7 +5,30 @@ import { ApiRequestError, apiRequest } from '../../lib/api';
 import { uuidv4 } from '../../lib/uuid';
 import { orderKeys } from '../orders/api';
 
-export const paymentKeys = { one: (id: string) => ['payments', 'one', id] as const };
+export const paymentKeys = {
+  one: (id: string) => ['payments', 'one', id] as const,
+  forOrder: (orderId: string) => ['payments', 'order', orderId] as const,
+};
+
+/**
+ * The order's latest payment. Loading it makes the server check a pending payment with Razorpay
+ * straight away, so reopening the app after paying shows the paid order without waiting.
+ */
+export function useOrderPayment(orderId: string) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: paymentKeys.forOrder(orderId),
+    queryFn: async () => {
+      const { payment } = await apiRequest<{ payment: PaymentView | null }>(
+        `/orders/${orderId}/payment`,
+      );
+      if (payment && payment.status !== 'pending' && payment.status !== 'initiated') {
+        void qc.invalidateQueries({ queryKey: orderKeys.one(orderId) });
+      }
+      return payment;
+    },
+  });
+}
 
 /** Starts (or reuses) the order's payment. One Idempotency-Key per attempt; new after any answer. */
 export function useStartPayment(orderId: string) {

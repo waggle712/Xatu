@@ -89,7 +89,21 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       signatureValid: valid,
     };
     if (!valid) {
-      await this.prisma.paymentWebhookEvent.create({ data }).catch(() => undefined);
+      // Kept for the record, but small: a forged request can't fill the database.
+      await this.prisma.paymentWebhookEvent
+        .create({
+          data: {
+            ...data,
+            eventType: 'invalid_signature',
+            payload: {
+              truncated: true,
+              bytes: raw.length,
+              sha256: createHash('sha256').update(raw).digest('hex'),
+            },
+            rawBody: text.slice(0, 1024),
+          },
+        })
+        .catch(() => undefined);
       return 'invalid' as const;
     }
     try {

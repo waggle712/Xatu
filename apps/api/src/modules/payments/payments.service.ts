@@ -224,12 +224,47 @@ export class PaymentsService {
   }
 
   /** Open payments to look at with Razorpay (no webhook yet, or the order is over). */
-  async pendingToCheck(olderThan: Date, limit = 100): Promise<Payment[]> {
+  async pendingToCheck(
+    olderThan: Date,
+    dueOrderIds: string[] = [],
+    limit = 200,
+  ): Promise<Payment[]> {
     return this.prisma.payment.findMany({
-      where: { status: 'pending', providerOrderId: { not: null }, createdAt: { lte: olderThan } },
+      where: {
+        status: 'pending',
+        providerOrderId: { not: null },
+        OR: [{ createdAt: { lte: olderThan } }, { orderId: { in: dueOrderIds } }],
+      },
       orderBy: { createdAt: 'asc' },
       take: limit,
     });
+  }
+
+  /** Expired in the last 72 hours (Razorpay's auto-capture window), not checked for an hour. */
+  async expiredToRecheck(limit = 50): Promise<Payment[]> {
+    return this.prisma.payment.findMany({
+      where: {
+        status: 'expired',
+        providerOrderId: { not: null },
+        createdAt: { gte: new Date(Date.now() - 72 * 60 * 60_000) },
+        OR: [
+          { lastCheckedAt: null },
+          { lastCheckedAt: { lte: new Date(Date.now() - 60 * 60_000) } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+  }
+
+  /** The order's latest payment for its buyer (null if none); a pending one is checked first. */
+  async forOrder(buyerId: string, orderId: string): Promise<PaymentView | null> {
+    await this.orders.get(buyerId, orderId); // 404 for anyone else's order
+    const latest = await this.prisma.payment.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return latest ? this.view(buyerId, latest.id) : null;
   }
 
   /** Nothing was captured and the order no longer waits for payment: the payment expires. */

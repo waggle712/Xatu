@@ -53,6 +53,18 @@ export class PaymentsController {
     return this.payments.start(user.id, id);
   }
 
+  @Get('orders/:id/payment')
+  @UseGuards(AuthGuard, RateLimitGuard)
+  @RateLimit({ name: 'payments:view', limit: 600, windowSeconds: 60 })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "The order's latest payment (checked with Razorpay if still pending)" })
+  async forOrder(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ payment: PaymentView | null }> {
+    return { payment: await this.payments.forOrder(user.id, id) };
+  }
+
   @Get('payments/:id')
   @UseGuards(AuthGuard, RateLimitGuard)
   @RateLimit({ name: 'payments:view', limit: 600, windowSeconds: 60 })
@@ -69,7 +81,7 @@ export class PaymentsController {
   @Post('webhooks/razorpay')
   @HttpCode(200)
   @UseGuards(RateLimitGuard)
-  @RateLimit({ name: 'webhooks:razorpay', limit: 1200, windowSeconds: 60 })
+  @RateLimit({ name: 'webhooks:razorpay', limit: 600, windowSeconds: 60 })
   @ApiExcludeEndpoint()
   async webhook(
     @Req() req: RawBodyRequest<Request>,

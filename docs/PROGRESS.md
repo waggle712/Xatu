@@ -97,10 +97,12 @@ The rules were added after prompts 1–5. These parts of the existing code don't
 - **Sellers can't see orders yet** (prompt 17). Old `idempotency_records` (24-hour expiry) aren't cleaned up yet; add a daily delete.
 - **Idempotency keys:** a retry with the same key gets the first answer, including a refusal like `price_changed`; the app makes a new key after any final answer.
 
-- **Payments are not in the ledger yet** (prompt 16). Each `payment.verified` outbox row carries the amount, currency and Razorpay ids so prompt 16 can record them. Refunds are only marked (`refund_pending`); nothing is sent back to buyers until prompt 16.
+- **Payments are not in the ledger yet** (prompt 16). The outbox relay already delivered (and marked published) the `payment.verified` rows, so prompt 16 backfills from `payments WHERE status IN ('verified', 'refund_pending')` (amount, currency and Razorpay ids are there) or by querying `outbox_events` by topic; the rows stay in the table. Refunds are only marked (`refund_pending`); nothing is sent back to buyers until prompt 16.
 - **Webhook fixtures are doc-derived** (no Razorpay account yet). Re-record them from real test-mode deliveries once keys exist (`apps/api/test/fixtures/razorpay/README.md`).
 - **A real test-mode payment hasn't run** (no keys). Locally, Pay shows "Online payment isn't available right now" until `RAZORPAY_*` test keys are in `apps/api/.env`.
 - **Outbox relay:** every outbox row from prompts 9–14 is delivered (and marked published) on first run; topics without a handler are simply marked published. Handlers run at least once, so they must be safe to repeat.
+- **The poller is the one expiry path:** every minute it asks Razorpay about pending payments (after a 2-minute webhook grace, or at once when their order is due to expire), delivers any resulting `payment.verified`, and only then expires unpaid orders. Expired payments are re-checked hourly for 72 hours (Razorpay's auto-capture window), so a late capture with a lost webhook is still found. Reopening an order also checks a pending payment with Razorpay straight away.
+- **Android dev build is out of date** after adding `react-native-razorpay`: rebuild it (`pnpm --filter mobile android`) before testing Pay on Android.
 - **Second payment on a placed order** (paid twice) and **paid after cancel** are marked `refund_pending`.
 
 ## Not verified yet
