@@ -40,13 +40,20 @@ Typed with strict zod schemas shared by the API and the app. Unknown properties 
 | `product_viewed`         | App                          | A buyer opens a product page                                               | `product_id`, `shop_handle`                                   |
 | `search_performed`       | App                          | A search finished                                                          | `query_length`, `results`, `transliterated` (never the words) |
 | `feed_item_opened`       | App                          | A product opened from the feed or search                                   | `product_id`, `position`, `source`                            |
+| `product_saved`          | App                          | A buyer saved a product (heart)                                            | `product_id`, `source`                                        |
+| `product_unsaved`        | App                          | A buyer removed a saved product                                            | `product_id`                                                  |
+| `shop_followed`          | App                          | A buyer followed a maker                                                   | `shop_handle`                                                 |
+| `shop_unfollowed`        | App                          | A buyer unfollowed a maker                                                 | `shop_handle`                                                 |
+| `share_tapped`           | App                          | The share sheet opened for a product or shop                               | `target_type`                                                 |
+| `share_link_opened`      | App                          | The app was opened from a shared link                                      | `target_type`, `signed_in`                                    |
+| `report_submitted`       | App                          | A report was sent                                                          | `target_type`, `reason` (never the details text)              |
 | `order_paid`             | API (with payments)          | Payment **verified** by webhook or server fetch, never the app callback    | `order_id`, `seller_id`, `total_paise`, `fulfilment_mode`     |
 | `order_delivered`        | API (with fulfilment)        | Order reaches `completed`                                                  | `order_id`, `seller_id`, `fulfilment_mode`                    |
 | `media_upload_started`   | App                          | A seller picked or took a photo and the upload began                       | `purpose`, `source`, `retry`                                  |
 | `media_upload_succeeded` | App                          | The worker marked the photo ready                                          | `purpose`, `media_id`, `byte_size`, `duration_ms`             |
 | `media_upload_failed`    | App                          | Permission refused, network error, timeout or rejected by the worker       | `purpose`, `reason`, `reject_reason`                          |
 
-`buyer_signed_up`, `product_draft_started`, `product_listed`, `product_viewed`, `search_performed`, `feed_item_opened` and the three `media_upload_*` events are wired today. The others are defined so each feature sends them in the agreed shape when it is built. Money events are sent from the API, not the app, so they count only what really happened.
+`buyer_signed_up`, `product_draft_started`, `product_listed`, `product_viewed`, `search_performed`, `feed_item_opened`, the three `media_upload_*` events and the seven save, follow, share and report events are wired today. The others are defined so each feature sends them in the agreed shape when it is built. Money events are sent from the API, not the app, so they count only what really happened.
 
 Analytics is fire-and-forget: a PostHog failure is logged and never changes a login, order or payment. An integration test checks that sign-in still works while analytics throws.
 
@@ -54,10 +61,13 @@ Analytics is fire-and-forget: a PostHog failure is logged and never changes a lo
 
 Every new feature ships behind a flag (`FEATURE_FLAGS` in `packages/shared`):
 
-| Flag                | PostHog key         | Default |
-| ------------------- | ------------------- | ------- |
-| `checkout`          | `checkout`          | off     |
-| `seller_onboarding` | `seller-onboarding` | off     |
+| Flag                | PostHog key         | Default               |
+| ------------------- | ------------------- | --------------------- |
+| `checkout`          | `checkout`          | off                   |
+| `seller_onboarding` | `seller-onboarding` | off                   |
+| `catalog`           | `catalog`           | off                   |
+| `discovery`         | `discovery`         | off (needs `catalog`) |
+| `social`            | `social`            | off (needs `catalog`) |
 
 In the app use `useFeatureFlag('checkout')` from `src/lib/analytics`. It returns `false` when PostHog is not configured or unreachable. Create the flag in PostHog with the same key before turning it on.
 

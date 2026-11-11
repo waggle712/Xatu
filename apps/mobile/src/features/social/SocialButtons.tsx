@@ -115,6 +115,7 @@ export function FollowButton({ handle, businessName }: { handle: string; busines
       onPress={onPress}
       style={({ pressed }) => ({
         minHeight: 48,
+        maxWidth: '100%',
         paddingHorizontal: theme.space[6],
         alignItems: 'center',
         justifyContent: 'center',
@@ -125,7 +126,8 @@ export function FollowButton({ handle, businessName }: { handle: string; busines
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Text variant="label" color={following ? 'ink' : 'onMarigold'}>
+      {/* Capped at 200% so the one-word Tamil label never splits mid-word. */}
+      <Text variant="label" color={following ? 'ink' : 'onMarigold'} maxFontSizeMultiplier={2}>
         {t(following ? 'social.following' : 'social.follow')}
       </Text>
     </Pressable>

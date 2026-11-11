@@ -391,7 +391,7 @@
     "followLabel": "{{name}} பின்தொடரவும்",
     "unfollowLabel": "{{name}} பின்தொடர்வதை நிறுத்தவும்",
     "followFailed": "பின்தொடர்வதை மாற்ற முடியவில்லை",
-    "followers": "பின்தொடர்பவர்கள்",
+    "followers": "பின்தொடர்வோர்",
     "share": "பகிர்",
     "shareProductText": "{{maker}} செய்த {{title}}, {{app}}-இல்",
     "shareShopText": "{{app}}-இல் {{name}}",

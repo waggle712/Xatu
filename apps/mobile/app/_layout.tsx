@@ -104,7 +104,7 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
           <Stack.Screen name="p/[id]" />
           <Stack.Screen name="saved" />
           <Stack.Screen name="following" />
-          <Stack.Screen name="report" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="report" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />

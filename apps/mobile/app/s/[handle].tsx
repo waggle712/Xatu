@@ -3,7 +3,7 @@ import { NearMeIcon, PickupSlotIcon, Text, TrustBadge, useTheme } from '@xatu/ui
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackButton } from '../../src/components/BackButton';
 import { HexAvatar } from '../../src/components/HexAvatar';
@@ -84,15 +84,24 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
       {shop.cover ? (
         <XImage image={shop.cover} aspectRatio={16 / 9} accessibilityLabel={shop.businessName} />
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[4] }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: theme.space[4],
+        }}
+      >
         <HexAvatar name={shop.businessName} />
-        <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around' }}>
-          <Stat value={shop.liveProductCount} label={t('shop.public.products')} />
-          <Stat value={shop.followerCount} label={t('social.followers')} />
-          <Stat value={shop.completedOrderCount} label={t('shop.public.completed')} />
-        </View>
+        <FollowButton handle={shop.handle} businessName={shop.businessName} />
       </View>
-      <FollowButton handle={shop.handle} businessName={shop.businessName} />
+      {/* Full width so Tamil labels get room and never break inside a word. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: theme.space[3] }}>
+        <Stat value={shop.liveProductCount} label={t('shop.public.products')} />
+        <Stat value={shop.followerCount} label={t('social.followers')} />
+        <Stat value={shop.completedOrderCount} label={t('shop.public.completed')} />
+      </View>
 
       <View style={{ gap: theme.space[2] }}>
         <Text variant="title" accessibilityRole="header">
@@ -198,14 +207,21 @@ function ShopProfile({ shop }: { shop: PublicShop }) {
 }
 
 function Stat({ value, label }: { value: number; label: string }) {
+  // At large text sizes three columns would split Tamil words; give each stat its own row.
+  const stacked = useWindowDimensions().fontScale > 1.3;
   return (
     <View
-      style={{ alignItems: 'center', flexShrink: 1 }}
+      style={{ flexGrow: 1, flexBasis: stacked ? '100%' : '33%', alignItems: 'center' }}
       accessible
       accessibilityLabel={`${value} ${label}`}
     >
       <Text variant="price">{String(value)}</Text>
-      <Text variant="caption" color="inkMuted" style={{ textAlign: 'center' }}>
+      <Text
+        variant="caption"
+        color="inkMuted"
+        maxFontSizeMultiplier={2}
+        style={{ textAlign: 'center' }}
+      >
         {label}
       </Text>
     </View>
