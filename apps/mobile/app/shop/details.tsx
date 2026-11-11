@@ -41,6 +41,10 @@ function DetailsForm({ shop }: { shop: MyShop }) {
   const [storyTa, setStoryTa] = useState(shop.storyTa ?? '');
   const [pickupAvailable, setPickup] = useState(shop.pickupAvailable);
   const [localDelivery, setLocal] = useState(shop.localDelivery);
+  const [fee, setFee] = useState(String(Math.round(shop.localDeliveryFeePaise / 100)));
+  const feeRupees = /^\d{1,4}$/.test(fee.trim()) ? Number(fee.trim()) : NaN;
+  const feeValid =
+    !localDelivery || (Number.isInteger(feeRupees) && feeRupees >= 0 && feeRupees <= 1000);
 
   return (
     <View style={{ gap: theme.space[4], flexGrow: 1 }}>
@@ -91,6 +95,17 @@ function DetailsForm({ shop }: { shop: MyShop }) {
         value={localDelivery}
         onChange={setLocal}
       />
+      {localDelivery ? (
+        <TextField
+          label={t('shop.details.deliveryFee')}
+          value={fee}
+          onChangeText={setFee}
+          keyboardType="number-pad"
+          maxLength={4}
+          prefix={<Text variant="label">₹</Text>}
+          error={feeValid ? null : t('shop.details.deliveryFeeError')}
+        />
+      ) : null}
       {update.isError ? (
         <Text variant="label" color="critical" accessibilityLiveRegion="polite">
           {errorMessage(update.error, t)}
@@ -99,7 +114,7 @@ function DetailsForm({ shop }: { shop: MyShop }) {
       <Button
         label={t('shop.save')}
         loading={update.isPending}
-        disabled={businessName.trim().length < 2}
+        disabled={businessName.trim().length < 2 || !feeValid}
         onPress={() =>
           save({
             businessName: businessName.trim(),
@@ -108,6 +123,7 @@ function DetailsForm({ shop }: { shop: MyShop }) {
             storyTa: storyTa.trim() || null,
             pickupAvailable,
             localDelivery,
+            ...(localDelivery ? { localDeliveryFeePaise: feeRupees * 100 } : {}),
           })
         }
         style={{ marginTop: 'auto' }}

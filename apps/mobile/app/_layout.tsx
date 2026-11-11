@@ -105,6 +105,10 @@ function RootStack({ signedIn }: { signedIn: boolean }) {
           <Stack.Screen name="saved" />
           <Stack.Screen name="following" />
           <Stack.Screen name="report" />
+          <Stack.Screen name="bag" />
+          <Stack.Screen name="checkout" />
+          <Stack.Screen name="address-new" />
+          <Stack.Screen name="order/[id]" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />

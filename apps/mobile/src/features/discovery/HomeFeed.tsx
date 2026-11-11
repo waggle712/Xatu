@@ -19,6 +19,7 @@ import {
   mapAvailable,
   prefetchCards,
 } from './FeedParts';
+import { BagButton } from '../orders/parts';
 import { useBuyerLocation } from './useBuyerLocation';
 
 /** Home feed (Feed design). Behind the `discovery` flag. */
@@ -69,6 +70,7 @@ export function HomeFeed() {
             )}
           </Pressable>
         ) : null}
+        <BagButton />
       </View>
       <OfflineBanner />
       {first?.origin.approximate && location.status !== 'checking' ? (
