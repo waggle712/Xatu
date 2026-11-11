@@ -23,7 +23,7 @@ import { ReportLink, SaveButton, ShareButton } from '../../src/features/social/S
 import { track, useFeatureFlag } from '../../src/lib/analytics';
 import { ApiRequestError } from '../../src/lib/api';
 import { errorMessage } from '../../src/lib/errors';
-import { clearPendingLink } from '../../src/lib/pendingLink';
+import { consumeLink } from '../../src/lib/pendingLink';
 import { useSession } from '../../src/store/session';
 
 /**
@@ -38,7 +38,10 @@ export default function ProductScreen() {
   const enabled = useFeatureFlag('catalog');
   const query = usePublicProduct(id);
   const gone = query.error instanceof ApiRequestError && query.error.status === 404;
-  useEffect(() => clearPendingLink(`/p/${id}`), [id]);
+  useEffect(() => {
+    const link = consumeLink(`/p/${id}`);
+    if (link) track('share_link_opened', { target_type: 'product', signed_in: !link.afterSignIn });
+  }, [id]);
 
   return (
     <SafeAreaView

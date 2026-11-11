@@ -1,29 +1,59 @@
 import { parseShareLink, sharePath } from '@xatu/shared';
 
 /**
- * A shared product/shop link opened while signed out. Browsing needs an account (decided
- * 11 Nov 2026), so the link waits here and opens once the person signs in. Only allowlisted
- * paths (parseShareLink) are ever stored, and a link older than 30 minutes is dropped.
+ * Shared product/shop links coming into the app. Browsing needs an account (decided 11 Nov 2026),
+ * so a link opened while signed out waits here and opens once the person signs in. Only
+ * allowlisted paths (parseShareLink) are ever stored or opened, and a link older than 30 minutes
+ * is dropped.
  */
 const MAX_AGE_MS = 30 * 60_000;
-let pending: { path: string; at: number } | null = null;
 
-export function rememberLink(link: string): string | null {
-  const target = parseShareLink(link);
-  if (!target) return null;
-  const path = sharePath(target);
-  pending = { path, at: Date.now() };
-  return path;
+interface Pending {
+  path: string;
+  at: number;
+  /** True once the link was handed over after a sign-in. */
+  afterSignIn: boolean;
 }
 
-/** The waiting link, once. */
+let pending: Pending | null = null;
+
+/**
+ * Called for every link that opens the app (`+native-intent`). Returns the screen to open, or
+ * null to stay where the app is. Anything but a product or shop page opens the app normally on
+ * first launch and is ignored later, so a crafted link can never reach seller or account screens.
+ * The link is always remembered: on a cold start the session hasn't loaded yet, so we can't tell
+ * here whether the person is signed in.
+ */
+export function handleIncomingLink(path: string, initial: boolean): string | null {
+  const target = parseShareLink(path);
+  if (!target) return initial ? '/' : null;
+  const screen = sharePath(target);
+  pending = { path: screen, at: Date.now(), afterSignIn: false };
+  return screen;
+}
+
+/** Right after sign-in: the waiting link, if it is still fresh. It stays until its page opens. */
 export function takePendingLink(now = Date.now()): string | null {
-  const p = pending;
-  pending = null;
-  return p && now - p.at <= MAX_AGE_MS ? p.path : null;
+  if (!pending || now - pending.at > MAX_AGE_MS) {
+    pending = null;
+    return null;
+  }
+  pending.afterSignIn = true;
+  return pending.path;
 }
 
-/** Called when the page opened (or on sign-out) so the link isn't opened a second time. */
-export function clearPendingLink(path?: string): void {
-  if (!path || pending?.path === path) pending = null;
+/**
+ * Called when a product or shop page opens. If that page came from a link, forgets the link (so
+ * it never opens twice) and says whether a sign-in came in between, for analytics.
+ */
+export function consumeLink(path: string): { afterSignIn: boolean } | null {
+  if (pending?.path !== path) return null;
+  const { afterSignIn } = pending;
+  pending = null;
+  return { afterSignIn };
+}
+
+/** On sign-out: drop any waiting link. */
+export function clearPendingLink(): void {
+  pending = null;
 }

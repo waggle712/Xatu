@@ -91,6 +91,7 @@ The rules were added after prompts 1–5. These parts of the existing code don't
 ## Not verified yet
 
 - iOS universal links and Android App Links (need the domain, the Apple Team ID and the Play signing certificate). `xatu://` links and the web preview page were checked on the iOS simulator and in a browser.
+- Opening a link from a cold start on a release build. On the development build, the dev launcher shows first; the signed-out wait-then-open flow was checked with the app running, and the cold-start case is covered by unit tests.
 
 - Real Firebase SMS login (needs the Firebase project; see `docs/firebase-setup.md`)
 - The app on a physical Android phone or iPhone

@@ -13,6 +13,7 @@ import type {
   SavedProductCard,
   SavedState,
 } from '@xatu/shared';
+import { useCallback } from 'react';
 import { apiRequest } from '../../lib/api';
 import { useFeatureFlag } from '../../lib/analytics';
 import { useSession } from '../../store/session';
@@ -38,8 +39,11 @@ export function useSocialEnabled(): boolean {
   return social && catalog;
 }
 
-/** Which products are saved and which shops are followed, for hearts and Follow buttons. */
-export function useSavedState() {
+/**
+ * Which products are saved and which shops are followed, for hearts and Follow buttons. Each
+ * caller selects only what it needs, so one heart tap re-renders one card, not the whole feed.
+ */
+function useSavedSelect<T>(select: (s: SavedState) => T) {
   const enabled = useSocialEnabled();
   const signedIn = useSession((s) => s.status === 'signedIn');
   return useQuery({
@@ -47,17 +51,18 @@ export function useSavedState() {
     enabled: enabled && signedIn,
     queryFn: () => apiRequest<SavedState>('/me/saved'),
     staleTime: 5 * 60_000,
+    select,
   });
 }
 
 export function useIsSaved(productId: string): boolean {
-  const { data } = useSavedState();
-  return data?.productIds.includes(productId) ?? false;
+  const select = useCallback((s: SavedState) => s.productIds.includes(productId), [productId]);
+  return useSavedSelect(select).data ?? false;
 }
 
 export function useIsFollowing(handle: string): boolean {
-  const { data } = useSavedState();
-  return data?.shopHandles.includes(handle) ?? false;
+  const select = useCallback((s: SavedState) => s.shopHandles.includes(handle), [handle]);
+  return useSavedSelect(select).data ?? false;
 }
 
 type Toggle = { on: boolean };

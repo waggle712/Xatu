@@ -12,9 +12,9 @@ import { EmptyState, ErrorState, LoadingState, OfflineBanner } from '../../src/c
 import { ShopProductGrid } from '../../src/features/catalog/ProductLists';
 import { usePublicShop } from '../../src/features/shop/api';
 import { FollowButton, ReportLink, ShareButton } from '../../src/features/social/SocialButtons';
-import { useFeatureFlag } from '../../src/lib/analytics';
+import { track, useFeatureFlag } from '../../src/lib/analytics';
 import { errorMessage } from '../../src/lib/errors';
-import { clearPendingLink } from '../../src/lib/pendingLink';
+import { consumeLink } from '../../src/lib/pendingLink';
 import { useSession } from '../../src/store/session';
 
 export default function PublicShopScreen() {
@@ -22,7 +22,10 @@ export default function PublicShopScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const query = usePublicShop(handle);
-  useEffect(() => clearPendingLink(`/s/${handle}`), [handle]);
+  useEffect(() => {
+    const link = consumeLink(`/s/${handle}`);
+    if (link) track('share_link_opened', { target_type: 'shop', signed_in: !link.afterSignIn });
+  }, [handle]);
 
   return (
     <SafeAreaView
