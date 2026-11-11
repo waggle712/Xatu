@@ -2,6 +2,7 @@ import { CatalogModule } from './catalog/catalog.module.js';
 import { ContentModule } from './content/content.module.js';
 import { FulfilmentModule } from './fulfilment/fulfilment.module.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { LedgerModule } from './ledger/ledger.module.js';
 import { MediaModule } from './media/media.module.js';
 import { MessagingModule } from './messaging/messaging.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
@@ -19,6 +20,7 @@ export const domainModules = [
   CatalogModule,
   OrdersModule,
   PaymentsModule,
+  LedgerModule,
   FulfilmentModule,
   TrustModule,
   MessagingModule,

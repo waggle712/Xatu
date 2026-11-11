@@ -346,6 +346,47 @@ export class OrdersService {
     return rows.map((r) => r.id);
   }
 
+  // ── For the ledger (it never reads order tables itself) ──
+
+  /** What the ledger needs to post an order's seller payable and settlement. */
+  async ledgerFacts(orderIds: string[]) {
+    const rows = await this.prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: {
+        id: true,
+        sellerId: true,
+        status: true,
+        subtotalPaise: true,
+        deliveryFeePaise: true,
+        totalPaise: true,
+        commissionPaise: true,
+        completedAt: true,
+      },
+    });
+    return new Map(rows.map((r) => [r.id, r]));
+  }
+
+  /** Completed orders past the dispute window (not disputed or refunded: status is `completed`). */
+  async settlementCandidates(completedBefore: Date, limit = 5_000): Promise<string[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { status: 'completed', completedAt: { lte: completedBefore } },
+      select: { id: true },
+      orderBy: { completedAt: 'asc' },
+      take: limit,
+    });
+    return rows.map((r) => r.id);
+  }
+
+  /** Orders that were placed (paid) at some point and not refunded, for the completeness check. */
+  async placedOrderIds(): Promise<string[]> {
+    const rows = await this.prisma.orderEvent.findMany({
+      where: { toStatus: 'placed' },
+      select: { orderId: true },
+      distinct: ['orderId'],
+    });
+    return rows.map((r) => r.orderId);
+  }
+
   /** For payments: an order's current status, or null. */
   async statusOf(orderId: string): Promise<OrderStatus | null> {
     const row = await this.prisma.order.findUnique({
@@ -395,7 +436,11 @@ export class OrdersService {
     if (!canTransitionOrder(from, to, actor)) throw invalidStatus();
     const { count } = await tx.order.updateMany({
       where: { id: orderId, status: from },
-      data: { status: to, ...(to === 'awaiting_payment' ? {} : { expiresAt: null }) },
+      data: {
+        status: to,
+        ...(to === 'completed' ? { completedAt: new Date() } : {}),
+        ...(to === 'awaiting_payment' ? {} : { expiresAt: null }),
+      },
     });
     if (count !== 1) throw invalidStatus();
     await this.recordChange(

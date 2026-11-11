@@ -7,3 +7,5 @@ API documentation (test mode, Nov 2026). There was no Razorpay account yet, so t
 
 Placeholders: `__ORDER_ID__` (Razorpay order id), `__PAYMENT_ID__`, `__AMOUNT__` (paise),
 `__CREATED_AT__` (unix seconds).
+
+`refund.processed` and `refund.failed` (prompt 16) also use `__REFUND_ID__` and `__RECEIPT__`.

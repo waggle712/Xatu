@@ -8,7 +8,8 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { bullConnection, QUEUES } from '../../queue/queue.js';
 import { PaymentsService } from './payments.service.js';
-import type { RazorpayPayment } from './razorpay.client.js';
+import type { RazorpayPayment, RazorpayRefund } from './razorpay.client.js';
+import { RefundsService } from './refunds.service.js';
 
 /** Constant-time check of Razorpay's HMAC-SHA256 over the exact bytes received. */
 export function validSignature(
@@ -38,6 +39,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly payments: PaymentsService,
+    private readonly refunds: RefundsService,
   ) {}
 
   onModuleInit(): void {
@@ -148,10 +150,19 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       where: { id: event.id },
       data: { attempts: { increment: 1 } },
     });
-    const entity = (event.payload as { payload?: { payment?: { entity?: RazorpayPayment } } })
-      .payload?.payment?.entity;
+    const body = (
+      event.payload as {
+        payload?: { payment?: { entity?: RazorpayPayment }; refund?: { entity?: RazorpayRefund } };
+      }
+    ).payload;
+    const entity = body?.payment?.entity;
     let outcome: string;
-    if (!entity || !entity.order_id) {
+    if (event.eventType === 'refund.processed' || event.eventType === 'refund.failed') {
+      const refund = body?.refund?.entity;
+      outcome = refund
+        ? await this.refunds.onProviderRefund({ ...refund, amount: Number(refund.amount) })
+        : 'ignored';
+    } else if (!entity || !entity.order_id) {
       outcome = 'ignored';
     } else if (event.eventType === 'payment.captured' || event.eventType === 'order.paid') {
       // Only captured evidence verifies; payment.authorized / payment.failed never do.

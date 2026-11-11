@@ -43,6 +43,20 @@ export async function setup(): Promise<void> {
   });
 
   execSync('npx prisma migrate deploy', { stdio: 'inherit', env: process.env });
+
+  // Run the app under the production grants: a login user in the xatu_app role, which may only
+  // SELECT and INSERT on ledger tables. Migrations above ran as the owner.
+  const appUser = 'xatu_app_test';
+  const appPassword = 'app_test_only_password';
+  execSync(
+    `docker exec ${pg.getId()} psql -U xatu -d xatu_test -v ON_ERROR_STOP=1 -c "CREATE ROLE ${appUser} LOGIN PASSWORD '${appPassword}' IN ROLE xatu_app"`,
+    { stdio: 'inherit' },
+  );
+  const url = new URL(pg.getConnectionUri());
+  url.username = appUser;
+  url.password = appPassword;
+  process.env.DATABASE_URL = url.toString();
+  process.env.DATABASE_OWNER_URL = pg.getConnectionUri();
 }
 
 export async function teardown(): Promise<void> {

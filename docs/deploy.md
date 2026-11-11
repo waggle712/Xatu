@@ -199,6 +199,27 @@ No real money until the pre-launch tests (prompt 22) pass and the lawyer and CA 
 4. The worker container (`RUN_WORKERS=true`) runs the webhook processor, the outbox relay (every 2 s) and the payments poller (every minute). Without it, webhooks are stored but nothing is processed.
 5. Check: make a test payment with UPI `success@razorpay`; the order becomes `placed` within seconds. Then re-record the webhook fixtures in `apps/api/test/fixtures/razorpay` from the real deliveries.
 
+## Ledger: database role, nightly jobs, finance commands (prompt 16)
+
+**The app connects as a restricted user.** Migrations create a `xatu_app` role (no login) that may only SELECT and INSERT on the ledger tables (`ledger_accounts`, `ledger_transactions`, `ledger_entries`) and do normal reads and writes elsewhere. Migrations keep running as the owner.
+
+1. Once, as the RDS owner (the migration user needs `CREATEROLE`): `CREATE ROLE xatu_api LOGIN PASSWORD '<from Secrets Manager>' IN ROLE xatu_app;`. Never put this password in a migration or the repo.
+2. API and worker containers: `DATABASE_URL` uses `xatu_api`. The migration task keeps the owner's URL.
+3. A future migration that adds a ledger table must `REVOKE UPDATE, DELETE` on it from `xatu_app` (default privileges grant them).
+
+**Nightly jobs** (worker container, India time): 01:00 settlement batches (orders completed more than 48 hours ago); 02:00 reconciliation with yesterday's Razorpay settlement report, then the ledger completeness check. Mismatches go to Sentry once each and are kept in `reconciliation_issues`.
+
+**Finance commands** (an ECS one-off task on the API image; until the admin console, access is controlled by AWS IAM). The person must be an active user with the `admin` role; every action needs a reason and is written to `admin_audit_logs`:
+
+```
+node dist/src/cli/finance.js list
+node dist/src/cli/finance.js approve --admin-phone +91XXXXXXXXXX --reason "Checked" <batchId> ...
+node dist/src/cli/finance.js export --admin-phone +91XXXXXXXXXX --reason "Bank upload" --out payouts.csv
+node dist/src/cli/finance.js mark-paid --admin-phone +91XXXXXXXXXX --reason "Sent" --reference <UTR> <batchId>
+```
+
+The CSV has no bank details until seller KYC (prompt 19), so it can't drive a real transfer yet. No Razorpay Route transfers.
+
 ## Rollback
 
 - **Bad image:** run `update-express-gateway-service` again with the **previous tag** (images are immutable, so the old tag is exactly what ran before). Because migrations are expand-only, the old image works against the current database.
