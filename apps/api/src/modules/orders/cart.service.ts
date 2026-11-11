@@ -131,7 +131,9 @@ export class CartService {
       include: { items: { orderBy: { createdAt: 'asc' } } },
     });
     if (!cart || cart.items.length === 0) return null;
-    await tx.cart.delete({ where: { id: cart.id } });
+    // Another order may have taken this bag a moment ago (two devices): then it's empty.
+    const { count } = await tx.cart.deleteMany({ where: { id: cart.id } });
+    if (count === 0) return null;
     return {
       sellerId: cart.sellerId,
       lines: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),

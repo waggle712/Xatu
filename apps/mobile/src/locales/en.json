@@ -78,7 +78,8 @@
       "too_many_addresses": "You've saved the most addresses allowed.",
       "invalid_order_status": "This order can't be changed now.",
       "order_not_found": "Order not found.",
-      "idempotency_in_progress": "Still working on it. Try again in a moment."
+      "idempotency_in_progress": "Still working on it. Try again in a moment.",
+      "too_many_unpaid_orders": "You have unpaid orders waiting. Pay or cancel one first."
     }
   },
   "tabs": {

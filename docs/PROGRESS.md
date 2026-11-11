@@ -92,6 +92,9 @@ The rules were added after prompts 1–5. These parts of the existing code don't
 - **No buyer fee** (decided 11 Nov 2026): the buyer pays item prices plus the delivery fee. Commission is the seller-side cut, recorded for the ledger (prompt 16).
 - **Local delivery has no area limit yet:** any buyer can choose it if the shop offers it. The maker can decline at acceptance (prompt 17); a delivery radius can come later.
 - **Unpaid orders wait 15 minutes** holding stock, then a job (every minute) marks them `expired`. Checkout never depends on the job: holds past their time already don't count. There is no payment yet, so every order ends cancelled or expired until prompt 15.
+- **At most 3 unpaid orders per buyer** at a time, so nobody can tie up a maker's stock with orders they never pay.
+- **For prompt 15:** a payment verified after an order's hold ran out must not move it to `placed` blindly (the stock may have been sold again): re-check stock under the lock, or refund. Buyer cancel works only on unpaid orders; cancelling a paid order needs the refund flow. Keep `checkout` off in production until payment works, or buyers can hold stock with orders they can't pay.
+- **Sellers can't see orders yet** (prompt 17). Old `idempotency_records` (24-hour expiry) aren't cleaned up yet; add a daily delete.
 - **Idempotency keys:** a retry with the same key gets the first answer, including a refusal like `price_changed`; the app makes a new key after any final answer.
 
 ## Not verified yet

@@ -50,6 +50,7 @@ const KNOWN_CODES = [
   'invalid_order_status',
   'order_not_found',
   'idempotency_in_progress',
+  'too_many_unpaid_orders',
 ] as const;
 
 /** Any error → a short message in the person's language. Never shows raw server text. */

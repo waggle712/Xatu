@@ -30,6 +30,7 @@ type OrderRow = Order & { items: OrderItem[] };
 
 /** Many buyers can queue on one locked row; give them time instead of failing with a 500. */
 const TX_OPTIONS = { maxWait: 15_000, timeout: 20_000 } as const;
+const MAX_UNPAID_ORDERS = 3;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
 
 /**
@@ -80,6 +81,17 @@ export class OrdersService {
       );
     }
     const address = input.addressId ? await this.addresses.owned(buyerId, input.addressId) : null;
+    // Stops one buyer tying up a maker's stock with orders they never pay.
+    const unpaid = await this.prisma.order.count({
+      where: { buyerId, status: 'awaiting_payment', expiresAt: { gt: new Date() } },
+    });
+    if (unpaid >= MAX_UNPAID_ORDERS) {
+      throw new AppError(
+        'too_many_unpaid_orders',
+        'You have unpaid orders waiting. Pay or cancel one first.',
+        HttpStatus.CONFLICT,
+      );
+    }
 
     for (let attempt = 1; ; attempt++) {
       try {
@@ -241,7 +253,15 @@ export class OrdersService {
   async cancel(buyerId: string, orderId: string): Promise<OrderView> {
     const order = await this.owned(buyerId, orderId);
     await this.prisma.$transaction(async (tx) => {
-      await this.transition(tx, order.id, order.status, 'cancelled_by_buyer', 'buyer', buyerId);
+      // Unpaid orders only: a paid order needs the refund flow (prompts 15-16).
+      await this.transition(
+        tx,
+        order.id,
+        'awaiting_payment',
+        'cancelled_by_buyer',
+        'buyer',
+        buyerId,
+      );
       await this.catalog.releaseForOrder(tx, order.id, 'released');
     });
     this.analytics.capture(buyerId, 'order_cancelled', { order_id: order.id, by: 'buyer' });

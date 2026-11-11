@@ -656,6 +656,71 @@ describe('Cart, stock holds and orders (e2e)', () => {
     });
   });
 
+  describe('guards for later prompts', () => {
+    it('cancel only works on unpaid orders (a paid order needs the refund flow)', async () => {
+      const s = await shop();
+      const p = await product(s.id);
+      const b = await buyer();
+      await addToCart(b.token, p.variantIds[0]!, 1).expect(200);
+      const order = await placeOrder(b.token, {
+        fulfilmentMode: 'pickup',
+        expectedTotalPaise: 45_000,
+      }).expect(201);
+      await prisma.order.update({
+        where: { id: order.body.id },
+        data: { status: 'placed', expiresAt: null },
+      });
+      const res = await http()
+        .post(`/orders/${order.body.id}/cancel`)
+        .set(auth(b.token))
+        .set(key())
+        .expect(409);
+      expect(res.body.error.code).toBe('invalid_order_status');
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: order.body.id } })).status).toBe(
+        'placed',
+      );
+    });
+
+    it('two orders racing on one bag (different keys) make one order and a clean cart_empty', async () => {
+      const s = await shop();
+      const p = await product(s.id, { stock: 5 });
+      const b = await buyer();
+      await addToCart(b.token, p.variantIds[0]!, 1).expect(200);
+      const body = { fulfilmentMode: 'pickup', expectedTotalPaise: 45_000 };
+      const results = await Promise.all([placeOrder(b.token, body), placeOrder(b.token, body)]);
+      expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+      expect(results.find((r) => r.status === 409)!.body.error.code).toBe('cart_empty');
+      expect(await prisma.order.count({ where: { buyerId: b.userId } })).toBe(1);
+    });
+
+    it('a buyer can hold at most 3 unpaid orders at a time', async () => {
+      const s = await shop();
+      const p = await product(s.id, { stock: 10 });
+      const b = await buyer();
+      for (let i = 0; i < 3; i++) {
+        await addToCart(b.token, p.variantIds[0]!, 1).expect(200);
+        await placeOrder(b.token, { fulfilmentMode: 'pickup', expectedTotalPaise: 45_000 }).expect(
+          201,
+        );
+      }
+      await addToCart(b.token, p.variantIds[0]!, 1).expect(200);
+      const fourth = await placeOrder(b.token, {
+        fulfilmentMode: 'pickup',
+        expectedTotalPaise: 45_000,
+      }).expect(409);
+      expect(fourth.body.error.code).toBe('too_many_unpaid_orders');
+      // Cancelling one frees a slot.
+      const first = await prisma.order.findFirstOrThrow({
+        where: { buyerId: b.userId },
+        orderBy: { createdAt: 'asc' },
+      });
+      await http().post(`/orders/${first.id}/cancel`).set(auth(b.token)).set(key()).expect(200);
+      await placeOrder(b.token, { fulfilmentMode: 'pickup', expectedTotalPaise: 45_000 }).expect(
+        201,
+      );
+    });
+  });
+
   // ───────────────────────────── Ownership ─────────────────────────────
 
   describe('ownership', () => {
