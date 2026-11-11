@@ -9,4 +9,5 @@ export function bullConnection(): Redis {
 export const QUEUES = {
   media: 'media',
   mediaDeadLetter: 'media-dead-letter',
+  ordersExpiry: 'orders-expiry',
 } as const;

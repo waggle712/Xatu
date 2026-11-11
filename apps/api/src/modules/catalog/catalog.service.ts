@@ -2,7 +2,9 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   canTransitionProduct,
   type CreateProductRequest,
+  type FulfilmentMode,
   fromPrice,
+  type Image,
   isProductPublic,
   moderationOnPublish,
   type ProductCard,
@@ -441,6 +443,171 @@ export class CatalogService {
     return maker ? row.sellerId : null;
   }
 
+  // ───────────────────────────── Stock holds (used by orders) ─────────────────────────────
+
+  /**
+   * What the bag needs to show each line: buyer-safe product details, price and how many can be
+   * bought right now (stock minus active holds). Lines whose product buyers can't see come back
+   * with `public: false`.
+   */
+  async variantsForCart(variantIds: string[]): Promise<Map<string, CartVariant>> {
+    if (variantIds.length === 0) return new Map();
+    const variants = await this.prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, deletedAt: null },
+      include: { product: { include: { media: { orderBy: { position: 'asc' }, take: 1 } } } },
+    });
+    const sellers = await this.profiles.publicSellers([
+      ...new Set(variants.map((v) => v.product.sellerId)),
+    ]);
+    const [held, images] = await Promise.all([
+      heldUnits(
+        this.prisma,
+        variants.map((v) => v.id),
+      ),
+      this.media.imagesFor(variants.flatMap((v) => v.product.media.map((m) => m.mediaId))),
+    ]);
+    return new Map(
+      variants.map((v) => {
+        const p = v.product;
+        const first = p.media[0];
+        return [
+          v.id,
+          {
+            variantId: v.id,
+            productId: p.id,
+            sellerId: p.sellerId,
+            title: p.title ?? '',
+            titleTa: p.titleTa,
+            label: v.label,
+            labelTa: v.labelTa,
+            pricePaise: paiseToNumber(v.pricePaise),
+            available: Math.max(0, v.stock - (held.get(v.id) ?? 0)),
+            fulfilmentModes: p.fulfilmentModes,
+            photo: (first && images.get(first.mediaId)) ?? null,
+            public: isProductPublic(p) && !!p.title && sellers.has(p.sellerId),
+          },
+        ];
+      }),
+    );
+  }
+
+  /** The seller of a variant buyers can see right now, or null (for adding to the bag). */
+  async publicVariantSeller(
+    variantId: string,
+  ): Promise<{ sellerId: string; productId: string } | null> {
+    const v = await this.prisma.productVariant.findFirst({
+      where: { id: variantId, deletedAt: null },
+      select: { productId: true, product: { select: { sellerId: true } } },
+    });
+    if (!v) return null;
+    const sellerId = await this.publicProductSellerId(v.productId);
+    return sellerId ? { sellerId, productId: v.productId } : null;
+  }
+
+  /**
+   * Checks stock for an order inside the caller's transaction (then call holdForOrder). Locks the variant rows FOR UPDATE
+   * in id order (so two orders can never deadlock), counts active holds with the database clock,
+   * and refuses with out_of_stock if any line can't be covered. Returns the locked rows'
+   * purchase-time details (price read under the lock is the price charged).
+   */
+  async reserve(
+    tx: Tx,
+    input: { lines: { variantId: string; quantity: number }[] },
+  ): Promise<ReservedLine[]> {
+    const ids = [...new Set(input.lines.map((l) => l.variantId))].sort();
+    const locked = await tx.$queryRaw<
+      {
+        id: string;
+        product_id: string;
+        stock: number;
+        price_paise: bigint;
+        label: string | null;
+        label_ta: string | null;
+        deleted_at: Date | null;
+      }[]
+    >`
+      SELECT id, product_id, stock, price_paise, label, label_ta, deleted_at
+      FROM product_variants WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
+    const byId = new Map(locked.map((r) => [r.id, r]));
+    const products = await tx.product.findMany({
+      where: { id: { in: [...new Set(locked.map((r) => r.product_id))] } },
+    });
+    const productById = new Map(products.map((p) => [p.id, p]));
+    const held = await heldUnits(tx, ids);
+
+    const short: { variantId: string; available: number }[] = [];
+    const out: ReservedLine[] = [];
+    for (const line of input.lines) {
+      const row = byId.get(line.variantId);
+      const product = row ? productById.get(row.product_id) : undefined;
+      if (!row || !product || row.deleted_at || !isProductPublic(product) || !product.title) {
+        throw new AppError(
+          'cart_has_problems',
+          'Something in your bag is no longer available.',
+          HttpStatus.CONFLICT,
+          {
+            variantId: line.variantId,
+          },
+        );
+      }
+      const available = row.stock - (held.get(row.id) ?? 0);
+      if (available < line.quantity)
+        short.push({ variantId: row.id, available: Math.max(0, available) });
+      out.push({
+        variantId: row.id,
+        productId: product.id,
+        sellerId: product.sellerId,
+        categoryId: product.categoryId,
+        title: product.title,
+        titleTa: product.titleTa,
+        label: row.label,
+        labelTa: row.label_ta,
+        unitPricePaise: row.price_paise,
+        quantity: line.quantity,
+        fulfilmentModes: product.fulfilmentModes,
+      });
+    }
+    if (short.length > 0) {
+      throw new AppError(
+        'out_of_stock',
+        'Sorry, not enough left. Someone else got there first.',
+        HttpStatus.CONFLICT,
+        {
+          lines: short,
+        },
+      );
+    }
+    return out;
+  }
+
+  /**
+   * Writes the holds for lines checked by `reserve`, in the same transaction (the variant rows
+   * are still locked, so nothing can change in between). Call after the order row exists.
+   */
+  async holdForOrder(
+    tx: Tx,
+    input: { buyerId: string; orderId: string; expiresAt: Date; lines: ReservedLine[] },
+  ): Promise<void> {
+    await tx.inventoryReservation.createMany({
+      data: input.lines.map((l) => ({
+        productId: l.productId,
+        variantId: l.variantId,
+        buyerId: input.buyerId,
+        orderId: input.orderId,
+        quantity: l.quantity,
+        expiresAt: input.expiresAt,
+      })),
+    });
+  }
+
+  /** Ends an order's active holds (cancelled → released, timed out → expired). */
+  async releaseForOrder(tx: Tx, orderId: string, to: 'released' | 'expired'): Promise<void> {
+    await tx.inventoryReservation.updateMany({
+      where: { orderId, status: 'active' },
+      data: { status: to },
+    });
+  }
+
   // ───────────────────────────── Internals ─────────────────────────────
 
   private async goLive(
@@ -711,11 +878,7 @@ export class CatalogService {
   }
 
   private async reservedUnits(tx: Tx, variantId: string): Promise<number> {
-    const { _sum } = await tx.inventoryReservation.aggregate({
-      where: { variantId, status: 'active', expiresAt: { gt: new Date() } },
-      _sum: { quantity: true },
-    });
-    return _sum.quantity ?? 0;
+    return (await heldUnits(tx, [variantId])).get(variantId) ?? 0;
   }
 
   private async readinessOf(db: Tx | PrismaService, productId: string) {
@@ -834,6 +997,51 @@ function toVariantView(v: ProductVariant) {
     pricePaise: paiseToNumber(v.pricePaise),
     stock: v.stock,
   };
+}
+
+/**
+ * Units held right now by unpaid orders, per variant: active holds that haven't expired by the
+ * DATABASE clock. The one count used by checkout and by seller stock edits.
+ */
+async function heldUnits(
+  db: Tx | PrismaService,
+  variantIds: string[],
+): Promise<Map<string, number>> {
+  if (variantIds.length === 0) return new Map();
+  const rows = await db.$queryRaw<{ variant_id: string; held: bigint }[]>`
+    SELECT variant_id, SUM(quantity)::bigint AS held FROM inventory_reservations
+    WHERE variant_id = ANY(${variantIds}::uuid[]) AND status = 'active' AND expires_at > now()
+    GROUP BY variant_id`;
+  return new Map(rows.map((r) => [r.variant_id, Number(r.held)]));
+}
+
+export interface CartVariant {
+  variantId: string;
+  productId: string;
+  sellerId: string;
+  title: string;
+  titleTa: string | null;
+  label: string | null;
+  labelTa: string | null;
+  pricePaise: number;
+  available: number;
+  fulfilmentModes: FulfilmentMode[];
+  photo: Image | null;
+  public: boolean;
+}
+
+export interface ReservedLine {
+  variantId: string;
+  productId: string;
+  sellerId: string;
+  categoryId: string | null;
+  title: string;
+  titleTa: string | null;
+  label: string | null;
+  labelTa: string | null;
+  unitPricePaise: bigint;
+  quantity: number;
+  fulfilmentModes: FulfilmentMode[];
 }
 
 function encodeSavedCursor(row: { createdAt: Date; productId: string }): string {

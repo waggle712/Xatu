@@ -72,6 +72,29 @@ export const analyticsEvents = {
     reason: z.enum(['permission', 'network', 'rejected', 'timeout', 'unknown']),
     reject_reason: z.string().max(40).optional(),
   }),
+  /** A buyer added an item to the bag (or changed its quantity). */
+  cart_item_added: z.strictObject({ product_id: id, quantity: z.number().int().min(1).max(20) }),
+  /** The order was created and its stock held (awaiting payment). Fired by the API. */
+  order_created: z.strictObject({
+    order_id: id,
+    seller_id: id,
+    total_paise: z.number().int().nonnegative(),
+    fulfilment_mode: fulfilmentMode,
+    item_count: z.number().int().positive(),
+  }),
+  /** The order couldn't be created; only the reason code. Fired by the app. */
+  order_failed: z.strictObject({
+    reason: z.enum([
+      'out_of_stock',
+      'price_changed',
+      'cart_has_problems',
+      'shop_not_accepting',
+      'network',
+      'other',
+    ]),
+  }),
+  /** A buyer cancelled an unpaid order. Fired by the API. */
+  order_cancelled: z.strictObject({ order_id: id, by: z.enum(['buyer', 'seller', 'system']) }),
   /** A buyer saved a product (heart). */
   product_saved: z.strictObject({
     product_id: id,
@@ -109,7 +132,11 @@ export function parseAnalyticsEvent<E extends AnalyticsEventName>(
  * otherwise, so the app behaves safely when PostHog is unreachable or not configured.
  */
 export const FEATURE_FLAGS = {
-  checkout: { key: 'checkout', default: false, description: 'Buy now, payment and order tracking' },
+  checkout: {
+    key: 'checkout',
+    default: false,
+    description: 'Bag, checkout, orders (and payment from prompt 15). Needs `catalog` on too.',
+  },
   seller_onboarding: {
     key: 'seller-onboarding',
     default: false,

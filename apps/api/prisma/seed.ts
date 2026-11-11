@@ -126,8 +126,8 @@ async function main(): Promise<void> {
   if (ruleCount === 0) {
     await prisma.commissionRule.create({
       data: {
-        name: 'Pilot default 5%',
-        rateBps: 500,
+        name: 'Pilot default 0% (until CA confirms)',
+        rateBps: 0,
         validFrom: new Date('2026-11-01T00:00:00+05:30'),
       },
     });
